@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  email     String?
+  cpfcnpj  String?                           // CPF/CNPJ vindo da Oficina Inteligente
+  createdAt DateTime @default(now())
+
+  vehicles  Vehicle[]
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  plate     String
+  brand     String
+  model     String
+  year      Int
+
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  diagnostics Diagnostic[]
+}
+
+model Diagnostic {
+  id          String   @id @default(uuid())
+  description String
+  status      String   @default("PENDING")
+
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  serviceOrders ServiceOrder[]
+}
+
+model ServiceOrder {
+  id           String   @id @default(uuid())
+  status       String   @default("OPEN")
+  notes        String?  @db.Text
+
+  oiId         String?  @unique               // OrdemDeServicoID da Oficina Inteligente
+  oiTotal      Float?                         // ValorDaOrdemDeServico
+
+  diagnosticId String
+  diagnostic   Diagnostic @relation(fields: [diagnosticId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ── Integrações ──────────────────────────────────────────────
+
+model ImportJob {
+  id         String   @id @default(uuid())
+  type       String                          // "clients" | "vehicles"
+  filename   String
+  total      Int      @default(0)
+  imported   Int      @default(0)
+  skipped    Int      @default(0)
+  errors     String?  @db.Text               // JSON array de mensagens
+  status     String   @default("DONE")       // DONE | FAILED
+  createdAt  DateTime @default(now())
+}
+
+model OiSyncJob {
+  id        String   @id @default(uuid())
+  source    String   @default("api")          // "api" (webservice) | "scrape" (coletor/bookmarklet)
+  date      String                            // dd/MM/yyyy sincronizada (ou label da coleta)
+  kind      String   @default("orders")       // orders | clients | vehicles
+  total     Int      @default(0)              // registros recebidos
+  created   Int      @default(0)              // novos criados no Prost
+  updated   Int      @default(0)              // atualizados
+  skipped   Int      @default(0)              // ignorados ou com erro
+  errors    String?  @db.Text                 // JSON array de mensagens de erro
+  status    String   @default("DONE")         // DONE | FAILED
+  createdAt DateTime @default(now())
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  source      String                          // "oficina_inteligente"
+  event       String                          // tipo do evento
+  payload     String   @db.Text              // JSON bruto recebido
+  status      String   @default("RECEIVED")  // RECEIVED | PROCESSED | FAILED | IGNORED
+  error       String?  @db.Text
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+}

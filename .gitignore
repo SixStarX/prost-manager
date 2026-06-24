@@ -1,0 +1,32 @@
+# Dependências
+node_modules/
+
+# Scaffolds antigos abandonados (substituídos por server/ e prost-web/)
+/src/
+/app.module.ts
+/package.json
+/package-lock.json
+/prost/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+!.env.example
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
