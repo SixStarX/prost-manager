@@ -44,8 +44,16 @@ model Vehicle {
 
 model Diagnostic {
   id          String   @id @default(uuid())
-  description String
+  description String   @db.Text
   status      String   @default("PENDING")
+
+  // ── Diagnóstico por IA (Gemini) ──
+  complaint   String?  @db.Text   // queixa do cliente
+  obdCode     String?             // código OBD informado
+  system      String?             // sistema afetado (Elétrico, Mecânico…)
+  confidence  String?             // Alta | Média | Baixa
+  aiResult    String?  @db.Text   // JSON completo retornado pela IA
+  source      String   @default("manual") // manual | ai
 
   vehicleId   String
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])

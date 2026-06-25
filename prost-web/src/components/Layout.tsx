@@ -7,6 +7,7 @@ const links = [
   { to: '/clients',        label: 'Clientes',          icon: '👥' },
   { to: '/vehicles',       label: 'Veículos',          icon: '🚗' },
   { to: '/diagnostics',    label: 'Diagnósticos',      icon: '🔍' },
+  { to: '/diagnostico-ia', label: 'Diagnóstico IA',    icon: '🤖' },
   { to: '/service-orders', label: 'Ordens de Serviço', icon: '📋' },
   { to: '/integrations',   label: 'Integrações',       icon: '🔗' },
 ];

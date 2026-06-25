@@ -9,6 +9,7 @@ import Vehicles from './pages/Vehicles';
 import Diagnostics from './pages/Diagnostics';
 import ServiceOrders from './pages/ServiceOrders';
 import Integrations from './pages/Integrations';
+import DiagnosticoIA from './pages/DiagnosticoIA';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="clients"        element={<Clients />} />
             <Route path="vehicles"       element={<Vehicles />} />
             <Route path="diagnostics"    element={<Diagnostics />} />
+            <Route path="diagnostico-ia" element={<DiagnosticoIA />} />
             <Route path="service-orders" element={<ServiceOrders />} />
             <Route path="integrations"   element={<Integrations />} />
           </Route>
