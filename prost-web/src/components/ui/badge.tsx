@@ -16,6 +16,11 @@ const badgeVariants = cva(
         pending:     'bg-overlay text-t2 border-white/[.14]',
         brand:       'bg-brand/[.15] text-[#b3a8ff] border-brand/25',
         destructive: 'bg-destructive/15 text-[#f87171] border-destructive/20',
+        // ── Situação temporal (Tabela Temporal de Veículos) ──
+        overdue:     'bg-destructive/[.14] text-[#f87171] border-destructive/25',
+        duetoday:    'bg-caution/[.15] text-[#fbbf24] border-caution/25',
+        soon:        'bg-sky/[.12] text-[#60a5fa] border-sky/20',
+        fresh:       'bg-ok/[.12] text-[#34d399] border-ok/20',
       },
     },
     defaultVariants: { variant: 'default' },

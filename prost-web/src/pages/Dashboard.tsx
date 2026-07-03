@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Users, Car, Stethoscope, ClipboardList, type LucideIcon } from 'lucide-react';
 import api from '../api';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { statusLabel, statusVariant } from '@/lib/status';
 import { formatDate } from '@/lib/format';
+import { VehicleTimelineTable } from '@/components/dashboard/VehicleTimelineTable';
+import type { TimelineItem } from '@/lib/timeline';
+
+/** Intervalo de atualização automática da tabela temporal (ms). */
+const REFRESH_MS = 30_000;
 
 interface StatCard {
   label: string;
@@ -29,17 +34,43 @@ const buildStats = (data: any): StatCard[] => [
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState(false);
+  const activeRef = useRef(true);
+  const hasDataRef = useRef(false);
 
-  useEffect(() => {
-    let active = true;
-    api
-      .get('/dashboard')
-      .then((r) => active && setData(r.data))
-      .catch(() => active && setError(true));
-    return () => {
-      active = false;
-    };
+  // Busca o resumo do dashboard. Silenciosa nos refetches (não pisca a tela).
+  const load = useCallback(async () => {
+    try {
+      const r = await api.get('/dashboard');
+      if (!activeRef.current) return;
+      hasDataRef.current = true;
+      setData(r.data);
+      setError(false);
+    } catch {
+      // Só exibe erro se nunca carregou; evita apagar dados já visíveis.
+      if (activeRef.current && !hasDataRef.current) setError(true);
+    }
   }, []);
+
+  // Carrega ao montar + polling periódico + refetch ao focar a aba,
+  // mantendo a tabela atualizada sem recarregar a página manualmente.
+  useEffect(() => {
+    activeRef.current = true;
+    load();
+
+    const timer = window.setInterval(load, REFRESH_MS);
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    return () => {
+      activeRef.current = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [load]);
 
   if (error) {
     return (
@@ -65,6 +96,9 @@ export default function Dashboard() {
               </div>
             ))}
       </div>
+
+      {/* Tabela Temporal de Veículos — área de destaque */}
+      <VehicleTimelineTable items={(data?.timeline as TimelineItem[] | undefined) ?? null} />
 
       {/* Recent service orders */}
       <Card>

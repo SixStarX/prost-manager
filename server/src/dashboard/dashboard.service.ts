@@ -14,6 +14,7 @@ export class DashboardService {
       diagnosticsByStatus,
       serviceOrdersByStatus,
       recentServiceOrders,
+      timelineOrders,
     ] = await Promise.all([
       this.prisma.client.count(),
       this.prisma.vehicle.count(),
@@ -43,6 +44,22 @@ export class DashboardService {
           },
         },
       }),
+
+      // Linha do tempo de veículos (para a Tabela Temporal do Dashboard).
+      // Limita a um teto seguro; a ordenação/derivação fica no frontend.
+      this.prisma.serviceOrder.findMany({
+        take: 300,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          diagnostic: {
+            include: {
+              vehicle: {
+                include: { client: true },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     return {
@@ -61,6 +78,19 @@ export class DashboardService {
         count: s._count.status,
       })),
       recentServiceOrders,
+      timeline: timelineOrders.map((o) => {
+        const vehicle = o.diagnostic?.vehicle;
+        return {
+          id: o.id,
+          status: o.status,
+          entryDate: o.createdAt,
+          expectedDeliveryDate: o.expectedDeliveryDate,
+          plate: vehicle?.plate ?? null,
+          brand: vehicle?.brand ?? null,
+          model: vehicle?.model ?? null,
+          clientName: vehicle?.client?.name ?? null,
+        };
+      }),
     };
   }
 }

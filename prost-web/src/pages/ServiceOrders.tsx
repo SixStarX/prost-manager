@@ -14,7 +14,22 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { statusLabel, statusVariant } from '@/lib/status';
 
-const EMPTY = { diagnosticId: '', notes: '' };
+const EMPTY = { diagnosticId: '', notes: '', expectedDeliveryDate: '' };
+
+/** ISO → valor de <input type="date"> (yyyy-mm-dd) no fuso local. */
+function toDateInput(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** yyyy-mm-dd → ISO ao meio-dia local (evita deslocar o dia por fuso). */
+function toIsoOrNull(value: string): string | null {
+  return value ? new Date(`${value}T12:00:00`).toISOString() : null;
+}
 
 export default function ServiceOrders() {
   const [orders, setOrders] = useState<any[] | null>(null);
@@ -32,7 +47,11 @@ export default function ServiceOrders() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.post('/service-orders', form);
+      await api.post('/service-orders', {
+        diagnosticId: form.diagnosticId,
+        notes: form.notes || undefined,
+        expectedDeliveryDate: toIsoOrNull(form.expectedDeliveryDate) ?? undefined,
+      });
       setForm(EMPTY);
       await load();
       toast.success('Ordem de serviço criada!');
@@ -50,6 +69,16 @@ export default function ServiceOrders() {
       toast.success(`Status atualizado para "${statusLabel(status)}"`);
     } catch {
       toast.error('Erro ao atualizar status.');
+    }
+  }
+
+  async function updateDelivery(id: string, value: string) {
+    try {
+      await api.patch(`/service-orders/${id}`, { expectedDeliveryDate: toIsoOrNull(value) });
+      await load();
+      toast.success(value ? 'Previsão de entrega atualizada' : 'Previsão de entrega removida');
+    } catch {
+      toast.error('Erro ao atualizar previsão de entrega.');
     }
   }
 
@@ -118,6 +147,14 @@ export default function ServiceOrders() {
                   onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                 />
               </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Previsão de entrega</Label>
+                <Input
+                  type="date"
+                  value={form.expectedDeliveryDate}
+                  onChange={(e) => setForm((p) => ({ ...p, expectedDeliveryDate: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2.5 mt-[18px]">
               <Button type="submit" disabled={saving}>
@@ -149,16 +186,17 @@ export default function ServiceOrders() {
               <TableHead>Proprietário</TableHead>
               <TableHead>Diagnóstico</TableHead>
               <TableHead>Observações</TableHead>
+              <TableHead>Previsão</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Atualizar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {!orders ? (
-              <SkeletonRows rows={4} cols={6} />
+              <SkeletonRows rows={4} cols={7} />
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-14">
+                <TableCell colSpan={7} className="text-center py-14">
                   <EmptyState icon={ClipboardList} text="Nenhuma ordem de serviço cadastrada" sub="Selecione um diagnóstico e crie a primeira OS" />
                 </TableCell>
               </TableRow>
@@ -174,6 +212,14 @@ export default function ServiceOrders() {
                   <TableCell className="font-semibold text-t1">{os.diagnostic?.vehicle?.client?.name}</TableCell>
                   <TableCell className="max-w-[220px] truncate">{os.diagnostic?.description}</TableCell>
                   <TableCell>{os.notes || <span className="text-t3">—</span>}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="date"
+                      value={toDateInput(os.expectedDeliveryDate)}
+                      onChange={(e) => updateDelivery(os.id, e.target.value)}
+                      className="h-8 w-[150px] text-xs py-1"
+                    />
+                  </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(os.status)}>{statusLabel(os.status)}</Badge>
                   </TableCell>

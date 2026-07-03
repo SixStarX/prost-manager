@@ -71,6 +71,8 @@ model ServiceOrder {
   oiId         String?  @unique               // OrdemDeServicoID da Oficina Inteligente
   oiTotal      Float?                         // ValorDaOrdemDeServico
 
+  expectedDeliveryDate DateTime?              // Previsão de saída/entrega do veículo
+
   diagnosticId String
   diagnostic   Diagnostic @relation(fields: [diagnosticId], references: [id])
 
