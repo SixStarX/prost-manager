@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -38,17 +39,24 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
 )
 CardTitle.displayName = 'CardTitle'
 
-const CardTitleIcon = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(
-  ({ className, ...props }, ref) => (
+interface CardTitleIconProps extends React.HTMLAttributes<HTMLSpanElement> {
+  /** Ícone lucide (preferencial). Alternativamente passe `children`. */
+  icon?: LucideIcon
+}
+
+const CardTitleIcon = React.forwardRef<HTMLSpanElement, CardTitleIconProps>(
+  ({ className, icon: Icon, children, ...props }, ref) => (
     <span
       ref={ref}
       className={cn(
         'w-[26px] h-[26px] rounded-xs flex items-center justify-center text-[13px] ' +
-        'bg-brand/[.07] border border-brand/40',
+        'bg-brand/[.10] border border-brand/40 text-brand',
         className
       )}
       {...props}
-    />
+    >
+      {Icon ? <Icon className="w-3.5 h-3.5" strokeWidth={2} /> : children}
+    </span>
   )
 )
 CardTitleIcon.displayName = 'CardTitleIcon'

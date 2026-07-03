@@ -12,7 +12,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         'text-[13.5px] font-sans text-t1 outline-none resize-y transition-all duration-150 ' +
         'placeholder:text-t4 ' +
         'hover:border-white/[.12] hover:bg-overlay ' +
-        'focus:border-brand focus:bg-overlay focus:shadow-[0_0_0_3px_rgba(230,57,70,.15)] ' +
+        'focus:border-brand focus:bg-overlay focus:shadow-[0_0_0_3px_rgba(124,108,255,.18)] ' +
         'disabled:opacity-50 disabled:cursor-not-allowed',
         className
       )}

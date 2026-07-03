@@ -191,7 +191,7 @@ function CollectorTab() {
               }}
               draggable
               className="inline-flex items-center gap-2 px-4 py-2 rounded-sm bg-brand text-white font-bold text-[13px] cursor-grab active:cursor-grabbing
-                         shadow-[0_0_20px_rgba(230,57,70,.3)] select-none"
+                         shadow-[0_0_20px_rgba(124,108,255,.35)] select-none"
             >
               🔧 Coletor Prost
             </a>
@@ -337,7 +337,7 @@ function SyncTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${status?.configured ? 'bg-ok shadow-[0_0_6px_rgba(52,211,153,.6)]' : 'bg-brand shadow-[0_0_6px_rgba(230,57,70,.4)]'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${status?.configured ? 'bg-ok shadow-[0_0_6px_rgba(16,185,129,.6)]' : 'bg-brand shadow-[0_0_6px_rgba(124,108,255,.45)]'}`} />
             <span className="text-[13px] text-t2 font-medium">
               {status?.configured
                 ? 'TOKEN configurado — API pronta para sincronização'

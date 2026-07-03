@@ -13,8 +13,8 @@ function Toaster({ ...props }: ToasterProps) {
           description: '!text-t2',
           actionButton: '!bg-brand !text-white',
           cancelButton: '!bg-raised !text-t2',
-          success: '!border-ok/20 [&_[data-icon]]:!text-ok',
-          error:   '!border-brand/20 [&_[data-icon]]:!text-[#f87171]',
+          success: '!border-ok/25 [&_[data-icon]]:!text-ok',
+          error:   '!border-destructive/30 [&_[data-icon]]:!text-[#f87171]',
         },
       }}
       {...props}
