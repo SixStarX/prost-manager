@@ -1,21 +1,25 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { CarFront, Car, Plus } from 'lucide-react';
 import api from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardTitleIcon, CardCount, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { PlateBadge, EmptyState } from './Dashboard';
+import { SkeletonRows } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PlateBadge } from '@/components/common/PlateBadge';
+import { Field } from '@/components/forms/Field';
+import { formatDate } from '@/lib/format';
 
 const EMPTY = { plate: '', brand: '', model: '', year: '', clientId: '' };
 
 export default function Vehicles() {
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [clients, setClients]   = useState<any[]>([]);
-  const [form, setForm]         = useState(EMPTY);
-  const [saving, setSaving]     = useState(false);
+  const [vehicles, setVehicles] = useState<any[] | null>(null);
+  const [clients, setClients] = useState<any[]>([]);
+  const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
 
   const load = () => api.get('/vehicles').then((r) => setVehicles(r.data));
   useEffect(() => {
@@ -45,14 +49,22 @@ export default function Vehicles() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle><CardTitleIcon>➕</CardTitleIcon>Novo Veículo</CardTitle>
+          <CardTitle>
+            <CardTitleIcon icon={CarFront} />
+            Novo Veículo
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[14px]">
               <Field label="Placa" req>
-                <Input required placeholder="ABC1234" value={form.plate}
-                       onChange={set('plate')} className="uppercase font-mono tracking-[.05em]" />
+                <Input
+                  required
+                  placeholder="ABC1234"
+                  value={form.plate}
+                  onChange={set('plate')}
+                  className="uppercase font-mono tracking-[.05em]"
+                />
               </Field>
               <Field label="Marca" req>
                 <Input required placeholder="Honda" value={form.brand} onChange={set('brand')} />
@@ -61,21 +73,18 @@ export default function Vehicles() {
                 <Input required placeholder="Civic" value={form.model} onChange={set('model')} />
               </Field>
               <Field label="Ano" req>
-                <Input required type="number" placeholder="2020" min={1900} max={2100}
-                       value={form.year} onChange={set('year')} />
+                <Input required type="number" placeholder="2020" min={1900} max={2100} value={form.year} onChange={set('year')} />
               </Field>
               <Field label="Proprietário" req>
-                <Select
-                  required
-                  value={form.clientId}
-                  onValueChange={(v) => setForm((p) => ({ ...p, clientId: v }))}
-                >
+                <Select required value={form.clientId} onValueChange={(v) => setForm((p) => ({ ...p, clientId: v }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente..." />
+                    <SelectValue placeholder="Selecione o cliente…" />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -83,10 +92,12 @@ export default function Vehicles() {
             </div>
             <div className="flex items-center gap-2.5 mt-[18px]">
               <Button type="submit" disabled={saving}>
-                {saving ? '…' : '+'}&nbsp;{saving ? 'Salvando...' : 'Adicionar Veículo'}
+                <Plus /> {saving ? 'Salvando…' : 'Adicionar Veículo'}
               </Button>
               {!saving && form.plate && (
-                <Button type="button" variant="secondary" onClick={() => setForm(EMPTY)}>Limpar</Button>
+                <Button type="button" variant="secondary" onClick={() => setForm(EMPTY)}>
+                  Limpar
+                </Button>
               )}
             </div>
           </form>
@@ -95,47 +106,49 @@ export default function Vehicles() {
 
       <Card>
         <CardHeader>
-          <CardTitle><CardTitleIcon>🚗</CardTitleIcon>Veículos Cadastrados</CardTitle>
-          <CardCount>{vehicles.length} total</CardCount>
+          <CardTitle>
+            <CardTitleIcon icon={Car} />
+            Veículos Cadastrados
+          </CardTitle>
+          {vehicles && <CardCount>{vehicles.length} total</CardCount>}
         </CardHeader>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Placa</TableHead><TableHead>Marca / Modelo</TableHead>
-              <TableHead>Ano</TableHead><TableHead>Proprietário</TableHead>
+              <TableHead>Placa</TableHead>
+              <TableHead>Marca / Modelo</TableHead>
+              <TableHead>Ano</TableHead>
+              <TableHead>Proprietário</TableHead>
               <TableHead>Cadastrado em</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {vehicles.length === 0 ? (
+            {!vehicles ? (
+              <SkeletonRows rows={4} cols={5} />
+            ) : vehicles.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-14">
-                  <EmptyState icon="🚗" text="Nenhum veículo cadastrado" sub="Cadastre um cliente primeiro, depois adicione o veículo" />
+                  <EmptyState icon={Car} text="Nenhum veículo cadastrado" sub="Cadastre um cliente primeiro, depois adicione o veículo" />
                 </TableCell>
               </TableRow>
-            ) : vehicles.map((v) => (
-              <TableRow key={v.id}>
-                <TableCell><PlateBadge plate={v.plate} /></TableCell>
-                <TableCell className="font-semibold text-t1">{v.brand} {v.model}</TableCell>
-                <TableCell>{v.year}</TableCell>
-                <TableCell>{v.client?.name}</TableCell>
-                <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">
-                  {new Date(v.createdAt).toLocaleDateString('pt-BR')}
-                </TableCell>
-              </TableRow>
-            ))}
+            ) : (
+              vehicles.map((v) => (
+                <TableRow key={v.id}>
+                  <TableCell>
+                    <PlateBadge plate={v.plate} />
+                  </TableCell>
+                  <TableCell className="font-semibold text-t1">
+                    {v.brand} {v.model}
+                  </TableCell>
+                  <TableCell>{v.year}</TableCell>
+                  <TableCell>{v.client?.name}</TableCell>
+                  <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">{formatDate(v.createdAt)}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
     </>
-  );
-}
-
-function Field({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}{req && <span className="text-brand ml-0.5">*</span>}</Label>
-      {children}
-    </div>
   );
 }

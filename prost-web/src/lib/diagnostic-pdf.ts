@@ -1,16 +1,22 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type { jsPDF } from 'jspdf';
 import type { DiagnosticoResultado, Veiculo } from './diagnostic-types';
 
 /**
  * Gera o PDF do laudo de diagnóstico (formato coluna estreita, ideal para mobile).
  * Portado do app original "Prost - Diagnóstico".
+ *
+ * jsPDF (~300 kB) é carregado dinamicamente apenas no momento da exportação,
+ * mantendo-o fora do bundle inicial e do chunk da página.
  */
-export function buildDiagnosticPDF(
+export async function buildDiagnosticPDF(
   resultado: DiagnosticoResultado,
   veiculo: Veiculo,
   queixa: string,
-): jsPDF {
+): Promise<jsPDF> {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [105, 350] });
   const margin = 8;
   const contentWidth = 105 - margin * 2;
@@ -131,15 +137,15 @@ export function buildDiagnosticPDF(
   return doc;
 }
 
-export function downloadPDF(resultado: DiagnosticoResultado, veiculo: Veiculo, queixa: string) {
-  const doc = buildDiagnosticPDF(resultado, veiculo, queixa);
+export async function downloadPDF(resultado: DiagnosticoResultado, veiculo: Veiculo, queixa: string) {
+  const doc = await buildDiagnosticPDF(resultado, veiculo, queixa);
   doc.save(`diagnostico_${(veiculo.modelo || 'veiculo').toLowerCase()}_${Date.now()}.pdf`);
 }
 
 export async function shareWhatsApp(
   resultado: DiagnosticoResultado, veiculo: Veiculo, queixa: string, phone: string,
 ) {
-  const doc = buildDiagnosticPDF(resultado, veiculo, queixa);
+  const doc = await buildDiagnosticPDF(resultado, veiculo, queixa);
   const pdfFile = new File([doc.output('blob')], `diagnostico_${veiculo.modelo}.pdf`, { type: 'application/pdf' });
 
   const sintomas = resultado.sintomas_identificados?.length
@@ -167,7 +173,7 @@ export async function shareWhatsApp(
 export async function shareEmail(
   resultado: DiagnosticoResultado, veiculo: Veiculo, queixa: string, email: string,
 ) {
-  const doc = buildDiagnosticPDF(resultado, veiculo, queixa);
+  const doc = await buildDiagnosticPDF(resultado, veiculo, queixa);
   const pdfFile = new File([doc.output('blob')], `diagnostico_${veiculo.modelo}.pdf`, { type: 'application/pdf' });
 
   const subject = `Diagnóstico Automotivo - ${veiculo.marca} ${veiculo.modelo}`;

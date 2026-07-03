@@ -1,22 +1,27 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { UserPlus, Users, Plus } from 'lucide-react';
 import api from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardTitleIcon, CardCount, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { EmptyState } from './Dashboard';
+import { SkeletonRows } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field } from '@/components/forms/Field';
+import { formatDate } from '@/lib/format';
 
 const EMPTY = { name: '', phone: '', email: '' };
 
 export default function Clients() {
-  const [clients, setClients] = useState<any[]>([]);
-  const [form, setForm]       = useState(EMPTY);
-  const [saving, setSaving]   = useState(false);
+  const [clients, setClients] = useState<any[] | null>(null);
+  const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
 
   const load = () => api.get('/clients').then((r) => setClients(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const set = (f: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [f]: e.target.value }));
@@ -40,7 +45,10 @@ export default function Clients() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle><CardTitleIcon>➕</CardTitleIcon>Novo Cliente</CardTitle>
+          <CardTitle>
+            <CardTitleIcon icon={UserPlus} />
+            Novo Cliente
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
@@ -57,10 +65,12 @@ export default function Clients() {
             </div>
             <div className="flex items-center gap-2.5 mt-[18px]">
               <Button type="submit" disabled={saving}>
-                {saving ? '…' : '+'}&nbsp;{saving ? 'Salvando...' : 'Adicionar Cliente'}
+                <Plus /> {saving ? 'Salvando…' : 'Adicionar Cliente'}
               </Button>
               {!saving && form.name && (
-                <Button type="button" variant="secondary" onClick={() => setForm(EMPTY)}>Limpar</Button>
+                <Button type="button" variant="secondary" onClick={() => setForm(EMPTY)}>
+                  Limpar
+                </Button>
               )}
             </div>
           </form>
@@ -69,8 +79,11 @@ export default function Clients() {
 
       <Card>
         <CardHeader>
-          <CardTitle><CardTitleIcon>👥</CardTitleIcon>Clientes Cadastrados</CardTitle>
-          <CardCount>{clients.length} total</CardCount>
+          <CardTitle>
+            <CardTitleIcon icon={Users} />
+            Clientes Cadastrados
+          </CardTitle>
+          {clients && <CardCount>{clients.length} total</CardCount>}
         </CardHeader>
         <Table>
           <TableHeader>
@@ -82,34 +95,27 @@ export default function Clients() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clients.length === 0 ? (
+            {!clients ? (
+              <SkeletonRows rows={4} cols={4} />
+            ) : clients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-14">
-                  <EmptyState icon="👥" text="Nenhum cliente cadastrado" sub="Use o formulário acima para adicionar" />
+                  <EmptyState icon={Users} text="Nenhum cliente cadastrado" sub="Use o formulário acima para adicionar" />
                 </TableCell>
               </TableRow>
-            ) : clients.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-semibold text-t1">{c.name}</TableCell>
-                <TableCell>{c.phone}</TableCell>
-                <TableCell>{c.email || <span className="text-t3">—</span>}</TableCell>
-                <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">
-                  {new Date(c.createdAt).toLocaleDateString('pt-BR')}
-                </TableCell>
-              </TableRow>
-            ))}
+            ) : (
+              clients.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-semibold text-t1">{c.name}</TableCell>
+                  <TableCell>{c.phone}</TableCell>
+                  <TableCell>{c.email || <span className="text-t3">—</span>}</TableCell>
+                  <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">{formatDate(c.createdAt)}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
     </>
-  );
-}
-
-function Field({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}{req && <span className="text-brand ml-0.5">*</span>}</Label>
-      {children}
-    </div>
   );
 }
