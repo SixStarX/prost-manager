@@ -14,6 +14,9 @@ export class DashboardService {
       diagnosticsByStatus,
       serviceOrdersByStatus,
       recentServiceOrders,
+      timelineOrders,
+      checklistsByStatus,
+      activeChecklists,
     ] = await Promise.all([
       this.prisma.client.count(),
       this.prisma.vehicle.count(),
@@ -43,6 +46,49 @@ export class DashboardService {
           },
         },
       }),
+
+      // Linha do tempo de veículos (para a Tabela Temporal do Dashboard).
+      // Limita a um teto seguro; a ordenação/derivação fica no frontend.
+      this.prisma.serviceOrder.findMany({
+        take: 300,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          diagnostic: {
+            include: {
+              vehicle: {
+                include: { client: true },
+              },
+            },
+          },
+        },
+      }),
+
+      // Checklists agregados por status (inclui DELIVERED) — indicadores do Dashboard.
+      this.prisma.checklist.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
+
+      // Checklists ativos (não entregues) — quadro semanal + lista no Dashboard.
+      this.prisma.checklist.findMany({
+        where: { status: { in: ['IN_SERVICE', 'WAITING_PARTS', 'READY'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          clientId: true,
+          vehicleId: true,
+          protocol: true,
+          unit: true,
+          status: true,
+          clientName: true,
+          vBrand: true,
+          vModel: true,
+          vPlate: true,
+          expectedDate: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     return {
@@ -60,7 +106,25 @@ export class DashboardService {
         status: s.status,
         count: s._count.status,
       })),
+      checklistsByStatus: checklistsByStatus.map((c) => ({
+        status: c.status,
+        count: c._count.status,
+      })),
+      activeChecklists,
       recentServiceOrders,
+      timeline: timelineOrders.map((o) => {
+        const vehicle = o.diagnostic?.vehicle;
+        return {
+          id: o.id,
+          status: o.status,
+          entryDate: o.createdAt,
+          expectedDeliveryDate: o.expectedDeliveryDate,
+          plate: vehicle?.plate ?? null,
+          brand: vehicle?.brand ?? null,
+          model: vehicle?.model ?? null,
+          clientName: vehicle?.client?.name ?? null,
+        };
+      }),
     };
   }
 }

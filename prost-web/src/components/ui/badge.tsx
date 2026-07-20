@@ -3,19 +3,23 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-[5px] px-[9px] py-0.5 rounded-full text-[11px] font-bold ' +
-  'tracking-[.03em] whitespace-nowrap border ' +
-  'before:content-[""] before:w-[5px] before:h-[5px] before:rounded-full before:bg-current before:shrink-0',
+  // Pill sólido do app antigo: px-2 py-0.5 rounded-full text-xs font-medium text-white
+  'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium',
   {
     variants: {
       variant: {
-        default:     'bg-raised text-t1 border-white/[.12]',
-        open:        'bg-sky/[.12] text-[#60a5fa] border-sky/20',
-        'in-progress':'bg-caution/[.12] text-[#fbbf24] border-caution/20',
-        done:        'bg-ok/[.12] text-[#34d399] border-ok/20',
-        pending:     'bg-overlay text-t2 border-white/[.14]',
-        brand:       'bg-brand/[.15] text-[#b3a8ff] border-brand/25',
-        destructive: 'bg-destructive/15 text-[#f87171] border-destructive/20',
+        default:     'bg-secondary text-secondary-foreground',
+        open:        'bg-blue-500 text-white',
+        'in-progress':'bg-yellow-500 text-white',
+        done:        'bg-green-500 text-white',
+        pending:     'bg-secondary text-muted-foreground',
+        brand:       'bg-primary text-primary-foreground',
+        destructive: 'bg-red-500 text-white',
+        // ── Situação temporal (Tabela Temporal de Veículos) ──
+        overdue:     'bg-red-500 text-white',
+        duetoday:    'bg-yellow-500 text-white',
+        soon:        'bg-blue-500 text-white',
+        fresh:       'bg-green-500 text-white',
       },
     },
     defaultVariants: { variant: 'default' },

@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 
 export class CreateServiceOrderDto {
   @IsString()
@@ -11,4 +11,9 @@ export class CreateServiceOrderDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  /** Previsão de saída/entrega (ISO 8601). Opcional. */
+  @IsOptional()
+  @IsDateString()
+  expectedDeliveryDate?: string;
 }

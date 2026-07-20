@@ -6,11 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn(
-        'bg-surface border border-white/[.08] rounded-md mb-4 overflow-hidden ' +
-        'shadow-[0_1px_3px_rgba(0,0,0,.6),inset_0_1px_0_rgba(255,255,255,.06)]',
-        className
-      )}
+      className={cn('card-industrial mb-4 overflow-hidden', className)}
       {...props}
     />
   )
@@ -21,7 +17,7 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center justify-between px-5 py-4 border-b border-white/[.05]', className)}
+      className={cn('flex items-center justify-between px-5 py-4 border-b border-border', className)}
       {...props}
     />
   )
@@ -32,7 +28,7 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center gap-2 text-[13px] font-bold text-t1 tracking-tight', className)}
+      className={cn('flex items-center gap-2 text-lg font-bold uppercase tracking-[.025em] text-foreground', className)}
       {...props}
     />
   )
@@ -49,13 +45,12 @@ const CardTitleIcon = React.forwardRef<HTMLSpanElement, CardTitleIconProps>(
     <span
       ref={ref}
       className={cn(
-        'w-[26px] h-[26px] rounded-xs flex items-center justify-center text-[13px] ' +
-        'bg-brand/[.10] border border-brand/40 text-brand',
+        'w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary',
         className
       )}
       {...props}
     >
-      {Icon ? <Icon className="w-3.5 h-3.5" strokeWidth={2} /> : children}
+      {Icon ? <Icon className="w-5 h-5" strokeWidth={2} /> : children}
     </span>
   )
 )
@@ -66,7 +61,7 @@ const CardCount = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpa
     <span
       ref={ref}
       className={cn(
-        'text-[11px] font-semibold text-t3 px-2 py-0.5 rounded-full bg-raised border border-white/[.05]',
+        'text-sm text-muted-foreground',
         className
       )}
       {...props}
@@ -84,7 +79,7 @@ CardContent.displayName = 'CardContent'
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center px-5 py-4 border-t border-white/[.05]', className)} {...props} />
+    <div ref={ref} className={cn('flex items-center px-5 py-4 border-t border-border', className)} {...props} />
   )
 )
 CardFooter.displayName = 'CardFooter'

@@ -1,89 +1,113 @@
+import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { NAV_ITEMS } from '@/lib/nav';
-import Logo from '@/components/brand/Logo';
+import { SIDEBAR_ITEMS } from '@/lib/nav';
+import { ProstLogotype } from '@/components/brand/Logo';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
-  /** Aberta no mobile (drawer). No desktop fica sempre visível. */
   open: boolean;
-  onNavigate: () => void;
+  onClose: () => void;
 }
 
-export default function Sidebar({ open, onNavigate }: SidebarProps) {
+/**
+ * Navegação lateral em drawer sobreposto.
+ *
+ * Deliberadamente em overlay (e não em coluna fixa): as telas de Home,
+ * Dashboard e Check-list têm métrica fiel ao original, e uma coluna
+ * persistente deslocaria o conteúdo. Sobreposto, nenhuma tela muda de
+ * geometria — aberto ou fechado.
+ */
+export default function Sidebar({ open, onClose }: SidebarProps) {
   const { logout } = useAuth();
+
+  /* Esc fecha; trava o scroll do fundo enquanto aberto. */
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
   return (
     <>
-      {/* Backdrop (apenas mobile) */}
       <div
         aria-hidden
-        onClick={onNavigate}
+        onClick={onClose}
         className={cn(
-          'fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-200 lg:hidden',
+          'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-200',
           open ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       />
 
       <aside
+        aria-hidden={!open}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-[244px] flex flex-col bg-surface border-r border-white/[.05]',
-          'transition-transform duration-300 ease-out lg:static lg:translate-x-0 lg:z-auto',
+          'fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col border-r border-border bg-card',
+          'transition-transform duration-300 ease-out',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
-        style={{ backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,.025) 0%, transparent 30%)' }}
       >
-        {/* Brand */}
-        <div className="flex items-center px-[18px] py-5 border-b border-white/[.05]">
-          <Logo tagline="Manager" markSize={36} />
+        {/* Marca */}
+        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+          <ProstLogotype className="h-9" />
+          <button
+            onClick={onClose}
+            aria-label="Fechar menu"
+            className="rounded-lg p-2 transition-colors hover:bg-secondary"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-1.5 overflow-y-auto">
-          <div className="px-[18px] pt-[18px] pb-1.5 text-[10px] font-bold tracking-[.12em] uppercase text-t4">
+        {/* Navegação */}
+        <nav className="flex-1 overflow-y-auto p-3">
+          <p className="px-3 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Menu
-          </div>
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          </p>
+          {SIDEBAR_ITEMS.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
-              onClick={onNavigate}
+              onClick={onClose}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2.5 mx-2.5 my-px px-2.5 py-[9px] rounded-sm text-[13px] font-medium',
-                  'transition-all duration-150 relative cursor-pointer',
-                  isActive ? 'nav-active' : 'text-t2 hover:bg-white/[.04] hover:text-t1',
+                  'mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 )
               }
             >
-              <span className="nav-icon w-[30px] h-[30px] rounded-xs flex items-center justify-center shrink-0 bg-white/[.04] text-t2 transition-all duration-150">
-                <Icon className="w-[15px] h-[15px]" strokeWidth={2} />
-              </span>
+              <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
               {label}
             </NavLink>
           ))}
         </nav>
 
-        {/* Footer / user */}
-        <div className="p-2.5 border-t border-white/[.05]">
+        {/* Sair */}
+        <div className="border-t border-border p-3">
           <button
             onClick={logout}
-            title="Sair"
-            className="group w-full flex items-center gap-2.5 px-2 py-[9px] rounded-sm cursor-pointer transition-all duration-150 hover:bg-white/[.04] text-left"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-secondary"
           >
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg,#7c6cff,#a855f7)' }}
-            >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               A
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[12.5px] font-semibold text-t1 truncate">Administrador</div>
-              <div className="text-[10.5px] text-t3 mt-px">Clique para sair</div>
-            </div>
-            <LogOut className="w-4 h-4 text-t3 transition-colors duration-150 group-hover:text-brand" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-foreground">
+                Administrador
+              </span>
+              <span className="block text-xs text-muted-foreground">Clique para sair</span>
+            </span>
+            <LogOut className="h-4 w-4 shrink-0 text-muted-foreground" />
           </button>
         </div>
       </aside>

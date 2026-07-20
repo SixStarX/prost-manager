@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Stethoscope, FilePlus2, Plus } from 'lucide-react';
 import api from '../api';
@@ -13,11 +14,13 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { DIAGNOSTIC_STATUS_LABEL, statusVariant } from '@/lib/status';
+import { clientProfilePath } from '@/lib/nav';
 import { formatDate } from '@/lib/format';
 
 const EMPTY = { description: '', vehicleId: '' };
 
 export default function Diagnostics() {
+  const navigate = useNavigate();
   const [diagnostics, setDiagnostics] = useState<any[] | null>(null);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [form, setForm] = useState(EMPTY);
@@ -129,7 +132,21 @@ export default function Diagnostics() {
               </TableRow>
             ) : (
               diagnostics.map((d) => (
-                <TableRow key={d.id}>
+                <TableRow
+                  key={d.id}
+                  onClick={() =>
+                    d.vehicle?.client?.id &&
+                    navigate(
+                      clientProfilePath(d.vehicle.client.id, { vehicleId: d.vehicle.id }),
+                    )
+                  }
+                  className={d.vehicle?.client?.id ? 'cursor-pointer' : undefined}
+                  title={
+                    d.vehicle?.client?.id
+                      ? `Abrir perfil de ${d.vehicle.client.name}`
+                      : undefined
+                  }
+                >
                   <TableCell className="max-w-[280px] truncate">{d.description}</TableCell>
                   <TableCell>
                     <PlateBadge plate={d.vehicle?.plate} />
