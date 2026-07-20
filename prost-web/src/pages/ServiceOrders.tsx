@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ClipboardList, ClipboardPlus, Plus } from 'lucide-react';
 import api from '../api';
@@ -13,6 +14,7 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { statusLabel, statusVariant } from '@/lib/status';
+import { clientProfilePath } from '@/lib/nav';
 
 const EMPTY = { diagnosticId: '', notes: '', expectedDeliveryDate: '' };
 
@@ -32,6 +34,7 @@ function toIsoOrNull(value: string): string | null {
 }
 
 export default function ServiceOrders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<any[] | null>(null);
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [form, setForm] = useState(EMPTY);
@@ -209,7 +212,26 @@ export default function ServiceOrders() {
                       {os.diagnostic?.vehicle?.brand} {os.diagnostic?.vehicle?.model}
                     </span>
                   </TableCell>
-                  <TableCell className="font-semibold text-t1">{os.diagnostic?.vehicle?.client?.name}</TableCell>
+                  <TableCell className="font-semibold text-t1">
+                    {os.diagnostic?.vehicle?.client?.id ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            clientProfilePath(os.diagnostic.vehicle.client.id, {
+                              vehicleId: os.diagnostic.vehicle.id,
+                            }),
+                          )
+                        }
+                        className="text-left underline-offset-4 transition-colors hover:text-primary hover:underline"
+                        title={`Abrir perfil de ${os.diagnostic.vehicle.client.name}`}
+                      >
+                        {os.diagnostic.vehicle.client.name}
+                      </button>
+                    ) : (
+                      os.diagnostic?.vehicle?.client?.name
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[220px] truncate">{os.diagnostic?.description}</TableCell>
                   <TableCell>{os.notes || <span className="text-t3">—</span>}</TableCell>
                   <TableCell>

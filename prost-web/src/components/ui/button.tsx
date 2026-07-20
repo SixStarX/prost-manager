@@ -4,32 +4,34 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold ' +
-  'rounded-sm transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed ' +
-  'active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ' +
+  'rounded-md transition-colors disabled:opacity-50 disabled:pointer-events-none ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
   '[&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default:
-          'bg-brand text-white shadow-[0_1px_3px_rgba(124,108,255,.35)] ' +
-          'hover:bg-brand-dark hover:shadow-[0_6px_20px_rgba(124,108,255,.3)]',
+          'bg-primary text-primary-foreground hover:bg-primary/90',
+        /** Botão de marca do app antigo — gradiente laranja + glow. */
+        brand:
+          'btn-brand',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
-          'border border-white/[.12] bg-raised text-t2 hover:bg-overlay hover:text-t1',
+          'border border-border bg-transparent hover:bg-secondary hover:text-secondary-foreground',
         secondary:
-          'bg-raised text-t2 border border-white/[.08] hover:bg-overlay hover:border-white/[.12] hover:text-t1',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:
-          'text-t2 hover:bg-white/[.05] hover:text-t1',
+          'hover:bg-secondary hover:text-secondary-foreground',
         link:
-          'text-brand underline-offset-4 hover:underline',
+          'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-4 py-2',
-        sm:      'h-8 px-3 text-xs',
-        lg:      'h-10 px-6',
-        icon:    'h-9 w-9',
+        default: 'h-10 px-4 py-2',
+        sm:      'h-9 px-3 text-xs',
+        lg:      'h-11 px-8',
+        icon:    'h-10 w-10',
       },
     },
     defaultVariants: {

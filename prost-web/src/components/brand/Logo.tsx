@@ -84,6 +84,28 @@ export function ProstWordmark({ className }: WordmarkProps) {
   );
 }
 
+/**
+ * Logotipo oficial da PROST — arte vetorizada em PNG com fundo transparente
+ * (`public/brand/prost-logo.png`, 640×200, proporção 3.2:1).
+ *
+ * Reduzida a partir do original de 6139×1920 (252 KB → 9 KB): o logotipo nunca
+ * é exibido acima de ~150px de largura, então 640px cobre telas 4x sem peso.
+ * A arte tem cor própria (#ccc) e não herda `currentColor`.
+ *
+ * Dimensione pela altura (`h-10 md:h-12`); a largura acompanha.
+ */
+export function ProstLogotype({ className }: { className?: string }) {
+  return (
+    <img
+      src="/brand/prost-logo.png"
+      alt="PROST Blindados"
+      width={640}
+      height={200}
+      className={cn('w-auto object-contain', className)}
+    />
+  );
+}
+
 interface LogoProps {
   /** `full` = símbolo + wordmark · `wordmark` = só texto · `mark` = só símbolo. */
   variant?: 'full' | 'wordmark' | 'mark';

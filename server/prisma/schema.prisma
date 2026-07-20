@@ -22,9 +22,34 @@ model Client {
   phone     String
   email     String?
   cpfcnpj  String?                           // CPF/CNPJ vindo da Oficina Inteligente
+
+  // ── Cadastro completo (tela "Adicionar Novo Cliente") ──
+  whatsapp  String?
+  birthDate DateTime?                         // Data de nascimento
+
+  // Endereço estruturado
+  zip          String?                        // CEP
+  street       String?                        // Rua
+  number       String?                        // Número
+  complement   String?                        // Complemento
+  neighborhood String?                        // Bairro
+  city         String?
+  state        String?                        // UF
+
+  // Informações adicionais
+  notes          String? @db.Text            // Observações
+  preferences    String? @db.Text            // Preferências
+  initialHistory String? @db.Text            // Histórico inicial
+  responsible    String?                     // Responsável pelo cadastro
+
+  // Assinaturas (dataURL PNG)
+  clientSignature      String? @db.LongText
+  responsibleSignature String? @db.LongText
+
   createdAt DateTime @default(now())
 
-  vehicles  Vehicle[]
+  vehicles   Vehicle[]
+  checklists Checklist[]
 }
 
 model Vehicle {
@@ -34,12 +59,102 @@ model Vehicle {
   model     String
   year      Int
 
+  // ── Campos adicionais (cadastro completo) ──
+  color    String?
+  mileage  Int?                               // Quilometragem
+  chassis  String?
+  renavam  String?
+
   clientId  String
   client    Client   @relation(fields: [clientId], references: [id])
 
   createdAt DateTime @default(now())
 
   diagnostics Diagnostic[]
+  checklists  Checklist[]
+}
+
+// ── Checklist / Vistoria de veículo ──────────────────────────
+// Prontuário de entrada do veículo na oficina. Guarda snapshots de cliente e
+// veículo para preservar o histórico mesmo que o cadastro mude depois.
+model Checklist {
+  id        String   @id @default(uuid())
+
+  // Vínculos opcionais — o fluxo da nova seção de Check-list cria registros
+  // "avulsos" (só snapshot); o fluxo do ClientProfile ainda envia vehicleId.
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  clientId  String?                                  // denormalizado p/ query do perfil
+  client    Client?  @relation(fields: [clientId], references: [id])
+
+  // Protocolo / Unidade de atendimento
+  unit        String?                                // MECANICA | FUNILARIA | BLINDADOS
+  protocol    String?                                // ex. CL-MEC-0052/26
+  protocolSeq Int?                                   // sequência numérica (base p/ próximo)
+
+  // Status do Veículo (abas do checklist)
+  status       String    @default("IN_SERVICE")      // IN_SERVICE | WAITING_PARTS | READY | DELIVERED
+  entryDate    DateTime?                              // Data de entrada
+  expectedDate DateTime?                              // Previsão de entrega
+  exitDate     DateTime?                              // Data de saída
+  responsible  String?                                // Responsável
+
+  // Snapshot — Dados do Cliente
+  clientName    String
+  clientPhone   String?                               // Telefone
+  clientMobile  String?                               // Celular / WhatsApp
+  clientPhone2  String?                               // Telefone 2
+  clientEmail   String?
+  clientCpfCnpj String?
+  clientRg      String?                               // RG / I.E.
+  clientNotes   String?  @db.Text                     // Outros / Observações (cliente)
+
+  // Endereço estruturado
+  clientAddress      String?  @db.Text                // Logradouro / endereço completo
+  clientNeighborhood String?                          // Bairro
+  clientCity         String?                          // Cidade
+  clientState        String?                          // Estado
+  clientZip          String?                          // CEP
+
+  // Snapshot — Dados do Veículo
+  vBrand   String?
+  vModel   String?
+  vYear    Int?
+  vPlate   String?
+  vColor   String?
+  vChassis String?
+  kmIn     Int?
+  kmOut    Int?
+
+  // Combustível
+  fuelType  String?                                   // Gasolina | Diesel | Etanol | Outro
+  fuelLevel Int?                                       // 0..100 (%)
+
+  // Seções item → condição (JSON: { "Antena": "OK", "Estepe": "AUSENTE", ... })
+  externalAccessories Json?
+  safetyEquipment     Json?
+  interiorTech        Json?
+
+  // Mapeamento de avarias (JSON: [{ x, y, type: "RISCO"|"AMASSADO"|"QUEBRA" }])
+  damageMarks Json?
+
+  // Diagnóstico e Prazos
+  diagnosis         String? @db.Text
+  requestedServices String? @db.Text
+  observations      String? @db.Text
+
+  // Assinaturas (imagem opcional em base64 dataURL)
+  signCompanyName  String?
+  signClientName   String?
+  signCompanyImage String? @db.LongText
+  signClientImage  String? @db.LongText
+  signedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([vehicleId])
 }
 
 model Diagnostic {

@@ -1,4 +1,4 @@
-import { IsInt, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class CreateVehicleDto {
   @IsString()
@@ -15,4 +15,10 @@ export class CreateVehicleDto {
 
   @IsString()
   clientId!: string;
+
+  // ── Campos adicionais (cadastro completo) ──
+  @IsOptional() @IsString() color?: string;
+  @IsOptional() @IsInt() mileage?: number;
+  @IsOptional() @IsString() chassis?: string;
+  @IsOptional() @IsString() renavam?: string;
 }
