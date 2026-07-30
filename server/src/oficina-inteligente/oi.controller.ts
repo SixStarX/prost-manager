@@ -1,10 +1,16 @@
 import {
-  Controller, Post, Get, Query, Body, HttpCode,
+  Controller,
+  Post,
+  Get,
+  Query,
+  Body,
+  HttpCode,
   BadRequestException,
 } from '@nestjs/common';
 import { OiService } from './oi.service';
 import { OiScrapeService } from './oi-scrape.service';
 import type { ScrapePayload } from './oi-scrape.service';
+import { Public } from '../auth/public.decorator';
 
 @Controller('oi')
 export class OiController {
@@ -17,6 +23,8 @@ export class OiController {
    * POST /oi/scrape — recebe os dados de uma tabela coletada pelo
    * bookmarklet dentro do painel da Oficina Inteligente.
    */
+  // Recebido do bookmarklet, que roda no painel da OI (origem externa, sem JWT).
+  @Public()
   @Post('scrape')
   @HttpCode(200)
   ingestScrape(@Body() payload: ScrapePayload) {
@@ -40,7 +48,9 @@ export class OiController {
     const dateStr = date?.trim() || this.todayBR();
 
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-      throw new BadRequestException('Formato de data inválido. Use dd/MM/yyyy.');
+      throw new BadRequestException(
+        'Formato de data inválido. Use dd/MM/yyyy.',
+      );
     }
 
     return this.svc.syncByDate(dateStr);

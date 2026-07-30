@@ -1,9 +1,19 @@
 import {
-  Controller, Post, Get, Param, Body, Headers,
-  Req, UnauthorizedException, HttpCode, Query,
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Headers,
+  Req,
+  UnauthorizedException,
+  HttpCode,
+  Query,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
+import { Public } from '../auth/public.decorator';
+import type { OiWebhookPayload } from './webhook.types';
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -17,22 +27,26 @@ export class WebhooksController {
    *   X-OI-Signature : sha256=<hmac>   (opcional — verificado se OI_WEBHOOK_SECRET estiver configurado)
    *   X-OI-Event     : client.created  (opcional — fallback para payload.event)
    */
+  // Ingestão externa: autenticada por HMAC (X-OI-Signature), não por JWT.
+  @Public()
   @Post('oficina-inteligente')
   @HttpCode(200)
   async receive(
-    @Req() req: Request,
-    @Body() body: any,
+    @Req() req: Request & { rawBody?: Buffer },
+    @Body() body: OiWebhookPayload,
     @Headers('x-oi-signature') signature?: string,
-    @Headers('x-oi-event')     eventHeader?: string,
+    @Headers('x-oi-event') eventHeader?: string,
   ) {
     // Verificação de assinatura
-    const rawBody = (req as any).rawBody as Buffer | undefined;
+    const rawBody = req.rawBody;
     if (rawBody) {
       const valid = this.svc.verifySignature(rawBody, signature);
-      if (!valid) throw new UnauthorizedException('Assinatura do webhook inválida.');
+      if (!valid)
+        throw new UnauthorizedException('Assinatura do webhook inválida.');
     }
 
-    const event = eventHeader || body?.event || body?.tipo || body?.type || 'unknown';
+    const event =
+      eventHeader || body.event || body.tipo || body.type || 'unknown';
     return this.svc.receive('oficina_inteligente', event, body);
   }
 

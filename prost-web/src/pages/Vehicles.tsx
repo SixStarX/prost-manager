@@ -10,10 +10,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { formatDate } from '@/lib/format';
 import { clientProfilePath } from '@/lib/nav';
+import type { Vehicle } from '@/api/types';
 
 export default function Vehicles() {
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState<any[] | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[] | null>(null);
 
   useEffect(() => {
     api.get('/vehicles').then((r) => setVehicles(r.data));

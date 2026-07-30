@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // Specs e e2e são excluídos do tsconfig (rodam via ts-jest), então o
+    // projeto type-checked do ESLint não os enxerga — alinhamos os ignores.
+    ignores: ['eslint.config.mjs', '**/*.spec.ts', 'test/**', 'dist/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ClientsService {
   constructor(private prisma: PrismaService) {}
 
-  create(data: any) {
+  create(data: Prisma.ClientCreateInput) {
     return this.prisma.client.create({ data });
   }
 

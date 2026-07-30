@@ -1,8 +1,27 @@
-import { Injectable, Logger, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+// @google/genai é ESM-only; num módulo CommonJS o import de tipos exige o
+// atributo de resolução (evita erro TS1541 sem tornar o projeto inteiro ESM).
+import type { GoogleGenAI, GenerateContentResponse } from '@google/genai' with {
+  'resolution-mode': 'import',
+};
 import { PrismaService } from '../../prisma/prisma.service';
 import { SYSTEM_PROMPT } from './system-prompt';
+import { errorMessage } from '../../common/errors';
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+
+/** Subconjunto (consumido pelo backend) do laudo estruturado devolvido pela IA. */
+export interface DiagnosticoResultado {
+  diagnostico_resumo?: string;
+  sistema_afetado?: string;
+  confianca?: string;
+  [key: string]: unknown;
+}
 
 export interface VeiculoInput {
   marca?: string;
@@ -21,12 +40,12 @@ export interface VeiculoInput {
 }
 
 export interface AnalyzeInput {
-  vehicleId?: string;          // veículo já cadastrado no Prost (integração profunda)
+  vehicleId?: string; // veículo já cadastrado no Prost (integração profunda)
   veiculo: VeiculoInput;
   queixa: string;
   obd?: string;
-  scannerPdfBase64?: string;   // PDF do scanner em base64 (sem o prefixo data:)
-  persist?: boolean;           // se true, salva o Diagnostic no banco
+  scannerPdfBase64?: string; // PDF do scanner em base64 (sem o prefixo data:)
+  persist?: boolean; // se true, salva o Diagnostic no banco
 }
 
 @Injectable()
@@ -40,7 +59,7 @@ export class DiagnosticsAiService {
   }
 
   // @google/genai é ESM-only; carregamos via import dinâmico (projeto é CommonJS).
-  private async client(): Promise<any> {
+  private async client(): Promise<GoogleGenAI> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new ServiceUnavailableException(
@@ -52,14 +71,16 @@ export class DiagnosticsAiService {
   }
 
   /** Sanitiza e parseia JSON que pode vir com cercas markdown ou texto extra. */
-  private parseJson(text: string): any {
-    let t = (text || '').replace(/```json\n?|```/g, '').trim();
+  private parseJson<T>(text: string): T {
+    const t = (text || '').replace(/```json\n?|```/g, '').trim();
     try {
-      return JSON.parse(t);
+      return JSON.parse(t) as T;
     } catch {
       const match = t.match(/\{[\s\S]*\}/);
-      if (match) return JSON.parse(match[0]);
-      throw new BadRequestException('A IA retornou uma resposta que não pôde ser interpretada.');
+      if (match) return JSON.parse(match[0]) as T;
+      throw new BadRequestException(
+        'A IA retornou uma resposta que não pôde ser interpretada.',
+      );
     }
   }
 
@@ -102,7 +123,7 @@ export class DiagnosticsAiService {
       },
     });
 
-    const data = this.parseJson(response.text || '{}');
+    const data = this.parseJson<VeiculoInput>(response.text || '{}');
     return { ...data, chassis: vin };
   }
 
@@ -120,18 +141,22 @@ Queixa do cliente: ${queixa}${obd ? `\nCódigo OBD: ${obd}` : ''}
 
 Execute diagnóstico completo com pesquisa web e retorne o JSON conforme as regras do sistema.${scannerPdfBase64 ? '\n\nAnalise também o relatório do scanner em anexo para um diagnóstico mais preciso.' : ''}`;
 
-    let contents: any = prompt;
-    if (scannerPdfBase64) {
-      contents = {
-        parts: [
-          { text: prompt },
-          { inlineData: { data: scannerPdfBase64, mimeType: 'application/pdf' } },
-        ],
-      };
-    }
+    const contents = scannerPdfBase64
+      ? {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                data: scannerPdfBase64,
+                mimeType: 'application/pdf',
+              },
+            },
+          ],
+        }
+      : prompt;
 
     const ai = await this.client();
-    let response;
+    let response: GenerateContentResponse;
     try {
       response = await ai.models.generateContent({
         model: MODEL,
@@ -142,33 +167,38 @@ Execute diagnóstico completo com pesquisa web e retorne o JSON conforme as regr
           responseMimeType: 'application/json',
         },
       });
-    } catch (err: any) {
-      this.logger.error(`Falha na chamada Gemini: ${err.message}`);
-      throw new ServiceUnavailableException(`Erro ao consultar a IA: ${err.message}`);
+    } catch (err) {
+      this.logger.error(`Falha na chamada Gemini: ${errorMessage(err)}`);
+      throw new ServiceUnavailableException(
+        `Erro ao consultar a IA: ${errorMessage(err)}`,
+      );
     }
 
     const text = response.text;
-    if (!text) throw new BadRequestException('A IA retornou uma resposta vazia.');
-    const resultado = this.parseJson(text);
+    if (!text)
+      throw new BadRequestException('A IA retornou uma resposta vazia.');
+    const resultado = this.parseJson<DiagnosticoResultado>(text);
 
     // ── Persistência (integração profunda) ──
     let savedId: string | null = null;
     if (input.persist && input.vehicleId) {
       const saved = await this.prisma.diagnostic.create({
         data: {
-          vehicleId:   input.vehicleId,
+          vehicleId: input.vehicleId,
           description: resultado.diagnostico_resumo || 'Diagnóstico por IA',
-          status:      'PENDING',
-          source:      'ai',
-          complaint:   queixa,
-          obdCode:     obd || null,
-          system:      resultado.sistema_afetado || null,
-          confidence:  resultado.confianca || null,
-          aiResult:    JSON.stringify(resultado),
+          status: 'PENDING',
+          source: 'ai',
+          complaint: queixa,
+          obdCode: obd || null,
+          system: resultado.sistema_afetado || null,
+          confidence: resultado.confianca || null,
+          aiResult: JSON.stringify(resultado),
         },
       });
       savedId = saved.id;
-      this.logger.log(`Diagnóstico IA salvo: ${savedId} (veículo ${input.vehicleId})`);
+      this.logger.log(
+        `Diagnóstico IA salvo: ${savedId} (veículo ${input.vehicleId})`,
+      );
     }
 
     return { resultado, diagnosticId: savedId };

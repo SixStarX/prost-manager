@@ -1,17 +1,27 @@
 import {
-  Controller, Post, Get, UploadedFile, UseInterceptors,
-  Res, HttpCode, BadRequestException,
+  Controller,
+  Post,
+  Get,
+  UploadedFile,
+  UseInterceptors,
+  Res,
+  HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { IntegrationsService } from './integrations.service';
-import { memoryStorage } from 'multer';
+import { memoryStorage, type FileFilterCallback } from 'multer';
 
 const csvUpload = {
   storage: memoryStorage(),
-  fileFilter: (_req: any, file: Express.Multer.File, cb: any) => {
+  fileFilter: (
+    _req: Express.Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => {
     if (!file.originalname.match(/\.(csv|txt)$/i)) {
-      return cb(new BadRequestException('Apenas arquivos .csv são aceitos.'), false);
+      return cb(new BadRequestException('Apenas arquivos .csv são aceitos.'));
     }
     cb(null, true);
   },
@@ -46,7 +56,10 @@ export class IntegrationsController {
   async exportClients(@Res() res: Response) {
     const csv = await this.svc.exportClients();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="prost-clientes.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="prost-clientes.csv"',
+    );
     res.send('﻿' + csv); // BOM para UTF-8 no Excel
   }
 
@@ -54,7 +67,10 @@ export class IntegrationsController {
   async exportVehicles(@Res() res: Response) {
     const csv = await this.svc.exportVehicles();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="prost-veiculos.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="prost-veiculos.csv"',
+    );
     res.send('﻿' + csv);
   }
 
@@ -62,7 +78,10 @@ export class IntegrationsController {
   async exportOrders(@Res() res: Response) {
     const csv = await this.svc.exportServiceOrders();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="prost-ordens-servico.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="prost-ordens-servico.csv"',
+    );
     res.send('﻿' + csv);
   }
 

@@ -4,6 +4,6 @@ import { IntegrationsService } from './integrations.service';
 
 @Module({
   controllers: [IntegrationsController],
-  providers:   [IntegrationsService],
+  providers: [IntegrationsService],
 })
 export class IntegrationsModule {}

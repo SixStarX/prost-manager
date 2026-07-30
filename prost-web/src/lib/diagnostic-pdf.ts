@@ -1,5 +1,10 @@
 import type { jsPDF } from 'jspdf';
+import type { RowInput } from 'jspdf-autotable';
 import type { DiagnosticoResultado, Veiculo } from './diagnostic-types';
+
+/** jspdf-autotable acrescenta `lastAutoTable` ao doc; como o import é dinâmico,
+ *  o augment de tipos não aplica — declaramos só o campo que consumimos. */
+type AutoTableDoc = jsPDF & { lastAutoTable: { finalY: number } };
 
 /**
  * Gera o PDF do laudo de diagnóstico (formato coluna estreita, ideal para mobile).
@@ -102,7 +107,7 @@ export async function buildDiagnosticPDF(
     margin: { left: margin, right: margin },
     tableWidth: contentWidth,
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = (doc as AutoTableDoc).lastAutoTable.finalY + 8;
 
   // Checklist
   if (resultado.checklist_sugerido?.length) {
@@ -118,8 +123,8 @@ export async function buildDiagnosticPDF(
 
   // Cotações recomendadas
   doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text(`${section++}. Melhores Cotações`, margin, y); y += 4;
-  const cotBody: any[] = [];
+  doc.text(`${section}. Melhores Cotações`, margin, y); y += 4;
+  const cotBody: RowInput[] = [];
   (resultado.cotacoes || []).forEach((c) =>
     c.resultados.forEach((r) => { if (r.recomendado) cotBody.push([c.peca, r.produto, r.canal, r.preco]); }),
   );
@@ -160,7 +165,7 @@ export async function shareWhatsApp(
     `*Custo Estimado:* ${resultado.custo_min} - ${resultado.custo_max}\n\n` +
     `*Ação:* ${resultado.acao_comprador}\n\n_Gerado por Prost - Diagnóstico_`;
 
-  if (navigator.share && (navigator as any).canShare?.({ files: [pdfFile] })) {
+  if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
     try {
       await navigator.share({ files: [pdfFile], title: 'Diagnóstico Automotivo', text: msg });
       return;
@@ -185,7 +190,7 @@ export async function shareEmail(
     `Peça Prioritária: ${resultado.peca_prioritaria}\n` +
     `Custo Estimado: ${resultado.custo_min} - ${resultado.custo_max}\n\nGerado por Prost - Diagnóstico`;
 
-  if (navigator.share && (navigator as any).canShare?.({ files: [pdfFile] })) {
+  if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
     try {
       await navigator.share({ files: [pdfFile], title: subject, text: body });
       return;

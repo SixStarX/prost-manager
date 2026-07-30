@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardHeader,
@@ -26,11 +25,8 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PlateBadge } from '@/components/common/PlateBadge';
 import { formatDate } from '@/lib/format';
 import {
-  checklistStatusLabel,
-  checklistStatusVariant,
   type Checklist,
   type ChecklistListItem,
   type ClientProfileData,
@@ -40,7 +36,7 @@ import { ChecklistTimeline } from '@/components/checklist/ChecklistTimeline';
 import { ChecklistDetail } from '@/components/checklist/ChecklistDetail';
 import { ChecklistForm } from '@/components/checklist/ChecklistForm';
 import { InfoItem } from '@/components/checklist/ChecklistSection';
-import { cn } from '@/lib/utils';
+import { PageHeader, StatChip, VehicleCard } from './client-profile/parts';
 
 type FormMode = { mode: 'create'; vehicle: VehicleSummary } | { mode: 'edit'; checklist: Checklist };
 
@@ -68,9 +64,26 @@ export default function ClientProfile() {
       .catch(() => setError(true));
   }, [id]);
 
+  // Carga inicial e recarga ao trocar de cliente. A guarda de montagem descarta
+  // respostas tardias; as recargas pós-ação reutilizam loadProfile().
   useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
+    if (!id) return;
+    let active = true;
+    api
+      .get(`/clients/${id}/profile`)
+      .then((r) => {
+        if (active) {
+          setProfile(r.data);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        if (active) setError(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const loadHistory = useCallback((vehicleId: string, preferChecklistId?: string) => {
     setHistory(null);
@@ -91,7 +104,6 @@ export default function ClientProfile() {
         setHistory([]);
         toast.error('Erro ao carregar histórico.');
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Deep-link do Dashboard: ?vehicle=<id>&checklist=<id> abre o checklist inline.
@@ -103,6 +115,9 @@ export default function ClientProfile() {
     const vehicle = profile.vehicles.find((v) => v.id === vehicleId);
     if (!vehicle) return;
     deepLinkApplied.current = true;
+    // Aplicação imperativa do deep-link, uma única vez (guardada por ref):
+    // uma ação disparada pela navegação, não sincronização de estado de render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedVehicle(vehicle.id);
     loadHistory(vehicle.id, checklistId ?? undefined);
     setSearchParams({}, { replace: true }); // limpa a URL após aplicar
@@ -399,103 +414,5 @@ export default function ClientProfile() {
         </div>
       )}
     </>
-  );
-}
-
-/* ── Subcomponentes locais ── */
-
-function PageHeader({
-  title,
-  subtitle,
-  onBack,
-  backLabel = 'Voltar',
-}: {
-  title: string;
-  subtitle?: string;
-  onBack: () => void;
-  backLabel?: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 mb-4">
-      <Button variant="secondary" size="icon" onClick={onBack} title={backLabel}>
-        <ArrowLeft />
-      </Button>
-      <div>
-        <h1 className="text-[17px] font-bold text-t1 leading-tight">{title}</h1>
-        {subtitle && <p className="text-[12px] text-t3 mt-0.5">{subtitle}</p>}
-      </div>
-    </div>
-  );
-}
-
-function StatChip({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Car;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-2.5 px-4 py-2.5 bg-raised border border-white/[.06] rounded-md">
-      <span className="w-8 h-8 rounded-sm bg-brand/[.10] border border-brand/30 text-brand flex items-center justify-center">
-        <Icon className="w-4 h-4" />
-      </span>
-      <div>
-        <div className="text-[17px] font-bold text-t1 leading-none">{value}</div>
-        <div className="text-[11px] text-t3 mt-0.5">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function VehicleCard({
-  vehicle: v,
-  active,
-  onSelect,
-  onNew,
-}: {
-  vehicle: VehicleSummary;
-  active: boolean;
-  onSelect: () => void;
-  onNew: () => void;
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-md border p-3.5 transition-all duration-150',
-        active ? 'bg-overlay border-brand/40' : 'bg-raised border-white/[.06] hover:border-white/[.14]',
-      )}
-    >
-      <button type="button" onClick={onSelect} className="w-full text-left">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[13.5px] font-bold text-t1">
-            {v.brand} {v.model}
-          </span>
-          <span className="text-[12px] text-t3">{v.year}</span>
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          <PlateBadge plate={v.plate} />
-          {v.currentStatus && (
-            <Badge variant={checklistStatusVariant(v.currentStatus)}>
-              {checklistStatusLabel(v.currentStatus)}
-            </Badge>
-          )}
-        </div>
-        <div className="mt-2.5 text-[11.5px] text-t3">
-          {v.checklistCount} {v.checklistCount === 1 ? 'checklist' : 'checklists'}
-          {v.lastChecklistAt && ` · último em ${formatDate(v.lastChecklistAt)}`}
-        </div>
-      </button>
-      <div className="mt-3 flex items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={onSelect}>
-          <History /> Histórico
-        </Button>
-        <Button size="sm" onClick={onNew}>
-          <Plus /> Novo
-        </Button>
-      </div>
-    </div>
   );
 }
