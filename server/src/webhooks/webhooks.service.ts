@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import type { OiWebhookPayload } from './webhook.types';
+import { errorMessage } from '../common/errors';
 
 @Injectable()
 export class WebhooksService {
@@ -14,11 +16,11 @@ export class WebhooksService {
     if (!secret) return true; // Se não configurado, aceita tudo (dev mode)
     if (!signature) return false;
 
-    const expected = createHmac('sha256', secret)
-      .update(rawBody)
-      .digest('hex');
+    const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
 
-    const sigPart = signature.startsWith('sha256=') ? signature.slice(7) : signature;
+    const sigPart = signature.startsWith('sha256=')
+      ? signature.slice(7)
+      : signature;
 
     try {
       return timingSafeEqual(Buffer.from(expected), Buffer.from(sigPart));
@@ -27,7 +29,11 @@ export class WebhooksService {
     }
   }
 
-  async receive(source: string, event: string, payload: object): Promise<{ ok: boolean; id: string }> {
+  async receive(
+    source: string,
+    event: string,
+    payload: OiWebhookPayload,
+  ): Promise<{ ok: boolean; id: string }> {
     const record = await this.prisma.webhookEvent.create({
       data: {
         source,
@@ -38,14 +44,20 @@ export class WebhooksService {
     });
 
     // Processa o evento de forma assíncrona (não bloqueia o response)
-    this.processEvent(record.id, event, payload).catch((err) =>
-      this.logger.error(`Falha ao processar evento ${record.id}: ${err.message}`)
+    void this.processEvent(record.id, event, payload).catch((err) =>
+      this.logger.error(
+        `Falha ao processar evento ${record.id}: ${errorMessage(err)}`,
+      ),
     );
 
     return { ok: true, id: record.id };
   }
 
-  private async processEvent(id: string, event: string, payload: any) {
+  private async processEvent(
+    id: string,
+    event: string,
+    payload: OiWebhookPayload,
+  ) {
     try {
       switch (event) {
         case 'client.created':
@@ -65,7 +77,9 @@ export class WebhooksService {
         case 'service_order.created':
         case 'os.created':
           // Para OS, precisaríamos de diagnóstico prévio — só logamos por enquanto
-          this.logger.log(`OS recebida via webhook: ${JSON.stringify(payload)}`);
+          this.logger.log(
+            `OS recebida via webhook: ${JSON.stringify(payload)}`,
+          );
           break;
 
         default:
@@ -81,17 +95,17 @@ export class WebhooksService {
         where: { id },
         data: { status: 'PROCESSED', processedAt: new Date() },
       });
-    } catch (err: any) {
+    } catch (err) {
       await this.prisma.webhookEvent.update({
         where: { id },
-        data: { status: 'FAILED', error: err.message },
+        data: { status: 'FAILED', error: errorMessage(err) },
       });
       throw err;
     }
   }
 
-  private async handleClientCreated(payload: any) {
-    const name  = payload.nome  || payload.name  || payload.razao_social;
+  private async handleClientCreated(payload: OiWebhookPayload) {
+    const name = payload.nome || payload.name || payload.razao_social;
     const phone = payload.telefone || payload.phone || payload.celular || '—';
     const email = payload.email || null;
 
@@ -106,8 +120,8 @@ export class WebhooksService {
     this.logger.log(`Cliente criado via webhook: ${name}`);
   }
 
-  private async handleClientUpdated(payload: any) {
-    const name  = payload.nome || payload.name;
+  private async handleClientUpdated(payload: OiWebhookPayload) {
+    const name = payload.nome || payload.name;
     const phone = payload.telefone || payload.phone || payload.celular;
     const email = payload.email;
 
@@ -128,12 +142,14 @@ export class WebhooksService {
     this.logger.log(`Cliente atualizado via webhook: ${name}`);
   }
 
-  private async handleVehicleCreated(payload: any) {
-    const plate    = payload.placa || payload.plate;
-    const brand    = payload.marca || payload.brand || '—';
-    const model    = payload.modelo || payload.model || '—';
-    const year     = parseInt(payload.ano || payload.year, 10) || new Date().getFullYear();
-    const cliName  = payload.cliente || payload.proprietario || payload.owner;
+  private async handleVehicleCreated(payload: OiWebhookPayload) {
+    const plate = payload.placa || payload.plate;
+    const brand = payload.marca || payload.brand || '—';
+    const model = payload.modelo || payload.model || '—';
+    const year =
+      parseInt(String(payload.ano ?? payload.year ?? ''), 10) ||
+      new Date().getFullYear();
+    const cliName = payload.cliente || payload.proprietario || payload.owner;
 
     if (!plate || !cliName) return;
 
@@ -146,12 +162,20 @@ export class WebhooksService {
       where: { name: { equals: cliName } },
     });
     if (!client) {
-      this.logger.warn(`Veículo ${plate} recebido mas cliente "${cliName}" não encontrado.`);
+      this.logger.warn(
+        `Veículo ${plate} recebido mas cliente "${cliName}" não encontrado.`,
+      );
       return;
     }
 
     await this.prisma.vehicle.create({
-      data: { plate: plate.toUpperCase(), brand, model, year, clientId: client.id },
+      data: {
+        plate: plate.toUpperCase(),
+        brand,
+        model,
+        year,
+        clientId: client.id,
+      },
     });
     this.logger.log(`Veículo criado via webhook: ${plate}`);
   }
@@ -163,8 +187,13 @@ export class WebhooksService {
       orderBy: { createdAt: 'desc' },
       take: limit,
       select: {
-        id: true, source: true, event: true,
-        status: true, error: true, createdAt: true, processedAt: true,
+        id: true,
+        source: true,
+        event: true,
+        status: true,
+        error: true,
+        createdAt: true,
+        processedAt: true,
         // payload omitido do listing (pode ser grande)
       },
     });
@@ -181,6 +210,12 @@ export class WebhooksService {
       this.prisma.webhookEvent.count({ where: { status: 'FAILED' } }),
       this.prisma.webhookEvent.count({ where: { status: 'IGNORED' } }),
     ]);
-    return { total, processed, failed, ignored, received: total - processed - failed - ignored };
+    return {
+      total,
+      processed,
+      failed,
+      ignored,
+      received: total - processed - failed - ignored,
+    };
   }
 }

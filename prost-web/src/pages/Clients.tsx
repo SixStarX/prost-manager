@@ -8,10 +8,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { SkeletonRows } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDate } from '@/lib/format';
+import type { Client } from '@/api/types';
 
 export default function Clients() {
   const navigate = useNavigate();
-  const [clients, setClients] = useState<any[] | null>(null);
+  const [clients, setClients] = useState<Client[] | null>(null);
 
   const load = () => api.get('/clients').then((r) => setClients(r.data));
   useEffect(() => {

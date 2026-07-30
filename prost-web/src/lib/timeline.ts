@@ -146,3 +146,46 @@ export function shopTimeLabel(days: number): string {
   if (days <= 0) return 'Entrou hoje';
   return `${days} ${days === 1 ? 'dia' : 'dias'}`;
 }
+
+/* ── Ordenação por coluna (cabeçalhos clicáveis da Tabela Temporal) ─────── */
+
+export type SortKey =
+  | 'client'
+  | 'vehicle'
+  | 'plate'
+  | 'entry'
+  | 'delivery'
+  | 'shop'
+  | 'remaining'
+  | 'status';
+
+const deliveryTime = (r: DerivedRow) =>
+  r.expectedDeliveryDate ? new Date(r.expectedDeliveryDate).getTime() : Number.POSITIVE_INFINITY;
+const remainingVal = (r: DerivedRow) => r.daysRemaining ?? Number.POSITIVE_INFINITY;
+
+/** Comparador para ordenação manual por coluna (ascendente; inverta p/ desc). */
+export function compareBy(key: SortKey, a: DerivedRow, b: DerivedRow): number {
+  switch (key) {
+    case 'client':
+      return (a.clientName ?? '').localeCompare(b.clientName ?? '', 'pt-BR');
+    case 'vehicle':
+      return `${a.brand ?? ''} ${a.model ?? ''}`.localeCompare(
+        `${b.brand ?? ''} ${b.model ?? ''}`,
+        'pt-BR',
+      );
+    case 'plate':
+      return (a.plate ?? '').localeCompare(b.plate ?? '');
+    case 'entry':
+      return new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime();
+    case 'delivery':
+      return deliveryTime(a) - deliveryTime(b);
+    case 'shop':
+      return a.daysInShop - b.daysInShop;
+    case 'remaining':
+      return remainingVal(a) - remainingVal(b);
+    case 'status':
+      return a.status.localeCompare(b.status);
+    default:
+      return 0;
+  }
+}

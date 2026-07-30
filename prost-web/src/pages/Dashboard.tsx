@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -30,6 +30,8 @@ import { VehicleTimelineTable } from '@/components/dashboard/VehicleTimelineTabl
 import { DeliveryBoard } from '@/components/dashboard/DeliveryBoard';
 import { checklistStatusLabel, checklistStatusVariant, type ChecklistSummary } from '@/lib/checklist';
 import type { TimelineItem } from '@/lib/timeline';
+import type { DashboardSummary, ServiceOrder } from '@/api/types';
+import { usePollingResource } from '@/hooks/usePollingResource';
 
 /** Intervalo de atualização automática da tabela temporal (ms). */
 const REFRESH_MS = 30_000;
@@ -47,7 +49,7 @@ interface StatCard {
   status?: string;
 }
 
-const buildStats = (data: any): StatCard[] => [
+const buildStats = (data: DashboardSummary): StatCard[] => [
   { label: 'Clientes',          value: data.totals.clients,      icon: Users,         tint: 'bg-sky',     glow: 'rgba(59,130,246,.3)',  sub: 'cadastrados', to: '/clients'        },
   { label: 'Veículos',          value: data.totals.vehicles,     icon: Car,           tint: 'bg-ok',      glow: 'rgba(16,185,129,.3)',  sub: 'na frota',    to: '/vehicles'       },
   { label: 'Diagnósticos',      value: data.totals.diagnostics,  icon: Stethoscope,   tint: 'bg-caution', glow: 'rgba(245,158,11,.3)',  sub: 'registrados', to: '/diagnostics'    },
@@ -55,7 +57,7 @@ const buildStats = (data: any): StatCard[] => [
 ];
 
 /** Indicadores de checklist (Em Atendimento / Aguardando / Prontos / Entregues). */
-const buildChecklistStats = (data: any): StatCard[] => {
+const buildChecklistStats = (data: DashboardSummary): StatCard[] => {
   const by: Record<string, number> = {};
   for (const c of data.checklistsByStatus ?? []) by[c.status] = c.count;
   return [
@@ -68,12 +70,8 @@ const buildChecklistStats = (data: any): StatCard[] => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState(false);
   /** Status selecionado nos indicadores de check-list; filtra a lista abaixo. */
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const activeRef = useRef(true);
-  const hasDataRef = useRef(false);
 
   // Abre um checklist no Perfil do Cliente (inline, sem página dedicada).
   const openChecklist = useCallback(
@@ -84,40 +82,16 @@ export default function Dashboard() {
     [navigate],
   );
 
-  // Busca o resumo do dashboard. Silenciosa nos refetches (não pisca a tela).
-  const load = useCallback(async () => {
-    try {
-      const r = await api.get('/dashboard');
-      if (!activeRef.current) return;
-      hasDataRef.current = true;
-      setData(r.data);
-      setError(false);
-    } catch {
-      // Só exibe erro se nunca carregou; evita apagar dados já visíveis.
-      if (activeRef.current && !hasDataRef.current) setError(true);
-    }
-  }, []);
-
-  // Carrega ao montar + polling periódico + refetch ao focar a aba,
-  // mantendo a tabela atualizada sem recarregar a página manualmente.
-  useEffect(() => {
-    activeRef.current = true;
-    load();
-
-    const timer = window.setInterval(load, REFRESH_MS);
-    const onFocus = () => {
-      if (document.visibilityState === 'visible') load();
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onFocus);
-
-    return () => {
-      activeRef.current = false;
-      window.clearInterval(timer);
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onFocus);
-    };
-  }, [load]);
+  // Resumo do dashboard com atualização automática (polling + refetch ao focar a
+  // aba). Silenciosa: mantém a tela sem piscar e só sinaliza erro na 1ª carga.
+  const fetchSummary = useCallback(
+    () => api.get<DashboardSummary>('/dashboard').then((r) => r.data),
+    [],
+  );
+  const { data, error } = usePollingResource(fetchSummary, {
+    intervalMs: REFRESH_MS,
+    refetchOnFocus: true,
+  });
 
   if (error) {
     return (
@@ -223,35 +197,35 @@ export default function Dashboard() {
                 </TableCell>
               </TableRow>
             ) : (
-              data.recentServiceOrders.map((os: any) => (
-                <TableRow
-                  key={os.id}
-                  onClick={() =>
-                    os.diagnostic?.vehicle?.client?.id &&
-                    navigate(
-                      clientProfilePath(os.diagnostic.vehicle.client.id, {
-                        vehicleId: os.diagnostic.vehicle.id,
-                      }),
-                    )
-                  }
-                  className={os.diagnostic?.vehicle?.client?.id ? 'cursor-pointer' : undefined}
-                >
-                  <TableCell>
-                    <PlateBadge plate={os.diagnostic.vehicle.plate} />
-                    <span className="ml-2 text-t2">
-                      {os.diagnostic.vehicle.brand} {os.diagnostic.vehicle.model}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-semibold text-t1">{os.diagnostic.vehicle.client.name}</TableCell>
-                  <TableCell className="max-w-[260px] truncate">{os.diagnostic.description}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant(os.status)}>{statusLabel(os.status)}</Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">
-                    {formatDate(os.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))
+              data.recentServiceOrders.map((os: ServiceOrder) => {
+                const vehicle = os.diagnostic?.vehicle;
+                const client = vehicle?.client;
+                return (
+                  <TableRow
+                    key={os.id}
+                    onClick={() =>
+                      client?.id &&
+                      navigate(clientProfilePath(client.id, { vehicleId: vehicle?.id }))
+                    }
+                    className={client?.id ? 'cursor-pointer' : undefined}
+                  >
+                    <TableCell>
+                      <PlateBadge plate={vehicle?.plate} />
+                      <span className="ml-2 text-t2">
+                        {vehicle?.brand} {vehicle?.model}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-semibold text-t1">{client?.name}</TableCell>
+                    <TableCell className="max-w-[260px] truncate">{os.diagnostic?.description}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(os.status)}>{statusLabel(os.status)}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-[11.5px] text-t3 tracking-[.03em]">
+                      {formatDate(os.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

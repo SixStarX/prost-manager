@@ -16,13 +16,14 @@ import { PlateBadge } from '@/components/common/PlateBadge';
 import { DIAGNOSTIC_STATUS_LABEL, statusVariant } from '@/lib/status';
 import { clientProfilePath } from '@/lib/nav';
 import { formatDate } from '@/lib/format';
+import type { Diagnostic, Vehicle } from '@/api/types';
 
 const EMPTY = { description: '', vehicleId: '' };
 
 export default function Diagnostics() {
   const navigate = useNavigate();
-  const [diagnostics, setDiagnostics] = useState<any[] | null>(null);
-  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 

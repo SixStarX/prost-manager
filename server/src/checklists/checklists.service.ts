@@ -56,7 +56,9 @@ export class ChecklistsService {
    * Sem placa não há como identificar o veículo — nesse caso mantém o
    * comportamento antigo (checklist avulso) em vez de criar lixo no cadastro.
    */
-  private async resolveOrCreateVehicle(overrides: Omit<CreateChecklistDto, 'vehicleId'>) {
+  private async resolveOrCreateVehicle(
+    overrides: Omit<CreateChecklistDto, 'vehicleId'>,
+  ) {
     const plate = normPlate(overrides.vPlate);
     if (!plate) return null;
 
@@ -82,7 +84,9 @@ export class ChecklistsService {
     });
     const existing =
       (doc && clientPool.find((c) => normDoc(c.cpfcnpj) === doc)) ||
-      clientPool.find((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+      clientPool.find(
+        (c) => c.name.trim().toLowerCase() === name.toLowerCase(),
+      );
 
     const clientId =
       existing?.id ??
@@ -134,9 +138,9 @@ export class ChecklistsService {
   async create(dto: CreateChecklistDto) {
     const { vehicleId, ...overrides } = dto;
 
-    let vehicle:
-      | Prisma.VehicleGetPayload<{ include: { client: true } }>
-      | null = null;
+    let vehicle: Prisma.VehicleGetPayload<{
+      include: { client: true };
+    }> | null = null;
 
     if (vehicleId) {
       vehicle = await this.prisma.vehicle.findUnique({
@@ -304,6 +308,9 @@ export class ChecklistsService {
 
     const hasMore = items.length > take;
     const page = hasMore ? items.slice(0, take) : items;
-    return { items: page, nextCursor: hasMore ? page[page.length - 1].id : null };
+    return {
+      items: page,
+      nextCursor: hasMore ? page[page.length - 1].id : null,
+    };
   }
 }

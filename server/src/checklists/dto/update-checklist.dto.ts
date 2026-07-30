@@ -55,7 +55,9 @@ export class UpdateChecklistDto {
 
   // ── Combustível ──
   @IsOptional() @Nullable() @IsString() fuelType?: string | null;
-  @IsOptional() @Nullable() @IsInt() @Min(0) @Max(100) fuelLevel?: number | null;
+  @IsOptional() @Nullable() @IsInt() @Min(0) @Max(100) fuelLevel?:
+    | number
+    | null;
 
   // ── Seções item → condição ──
   @IsOptional() @IsObject() externalAccessories?: Record<string, string>;

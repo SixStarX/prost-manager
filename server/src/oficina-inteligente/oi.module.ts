@@ -5,6 +5,6 @@ import { OiScrapeService } from './oi-scrape.service';
 
 @Module({
   controllers: [OiController],
-  providers:   [OiService, OiScrapeService],
+  providers: [OiService, OiScrapeService],
 })
 export class OiModule {}

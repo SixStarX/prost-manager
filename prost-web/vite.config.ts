@@ -18,4 +18,23 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Isola o núcleo do React num chunk próprio: muda raramente, então
+        // fica em cache entre deploys enquanto o código do app evolui.
+        // rolldown (Vite 8) espera manualChunks como função.
+        manualChunks(id) {
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'react-vendor';
+          }
+        },
+      },
+    },
+  },
 })

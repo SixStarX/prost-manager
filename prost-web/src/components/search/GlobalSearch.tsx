@@ -57,30 +57,46 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
     return () => window.removeEventListener('keydown', onKey);
   }, [onOpenChange]);
 
-  // Carrega os dados na primeira abertura e trava o scroll do fundo.
+  // Reset ao abrir — feito durante o render (padrão de reset por mudança de prop).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setQuery('');
+      setActive(0);
+    }
+  }
+
+  // Foco + trava de scroll enquanto aberto; carrega os dados na 1ª abertura.
   useEffect(() => {
     if (!open) return;
-    setQuery('');
-    setActive(0);
     inputRef.current?.focus();
     document.body.style.overflow = 'hidden';
 
-    if (!loaded && !loading) {
-      setLoading(true);
-      setError(false);
-      Promise.all([api.get('/vehicles'), api.get('/clients')])
-        .then(([v, c]) => {
+    let active = true;
+    if (!loaded) {
+      const loadData = async () => {
+        setLoading(true);
+        setError(false);
+        try {
+          const [v, c] = await Promise.all([api.get('/vehicles'), api.get('/clients')]);
+          if (!active) return;
           setVehicles(v.data);
           setClients(c.data);
           setLoaded(true);
-        })
-        .catch(() => setError(true))
-        .finally(() => setLoading(false));
+        } catch {
+          if (active) setError(true);
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+      void loadData();
     }
     return () => {
+      active = false;
       document.body.style.overflow = '';
     };
-  }, [open, loaded, loading]);
+  }, [open, loaded]);
 
   // Filtragem em memória (memoizada) — nenhuma consulta repetida ao servidor.
   const { vehicleHits, clientHits, flat } = useMemo(() => {
@@ -107,10 +123,13 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
     return { vehicleHits: vh, clientHits: ch, flat };
   }, [query, vehicles, clients]);
 
-  // Mantém o índice ativo dentro dos limites quando os resultados mudam.
-  useEffect(() => {
+  // Mantém o índice ativo dentro dos limites quando os resultados mudam —
+  // durante o render (padrão de reset por mudança de prop), não em effect.
+  const [prevLen, setPrevLen] = useState(flat.length);
+  if (flat.length !== prevLen) {
+    setPrevLen(flat.length);
     setActive((a) => Math.min(a, Math.max(0, flat.length - 1)));
-  }, [flat.length]);
+  }
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 

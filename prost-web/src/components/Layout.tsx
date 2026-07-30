@@ -1,32 +1,10 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import AppHeader from './layout/AppHeader';
 import Sidebar from './layout/Sidebar';
 import GlobalSearch from './search/GlobalSearch';
+import { HeaderActionsContext } from './layout/header-actions';
 import { taglineForPath, SIDEBAR_ROOTS } from '@/lib/nav';
-
-/** Permite que uma página injete ações no slot direito do cabeçalho. */
-const HeaderActionsContext = createContext<(node: ReactNode) => void>(() => {});
-
-/**
- * Registra ações no cabeçalho enquanto a página estiver montada.
- * Uso: `useHeaderActions(<HeaderIconButton … />, [deps])`.
- */
-export function useHeaderActions(node: ReactNode, deps: unknown[] = []) {
-  const setActions = useContext(HeaderActionsContext);
-  useEffect(() => {
-    setActions(node);
-    return () => setActions(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-}
 
 /**
  * Shell global — réplica do app antigo: cabeçalho fixo com a marca centralizada
@@ -37,6 +15,14 @@ export default function Layout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actions, setActions] = useState<ReactNode>(null);
+
+  /* Troca de rota limpa as ações da página anterior — feito durante o render
+     (padrão de reset por mudança de prop), não em effect. */
+  const [prevPath, setPrevPath] = useState(pathname);
+  if (pathname !== prevPath) {
+    setPrevPath(pathname);
+    setActions(null);
+  }
 
   /* Nas raízes o slot esquerdo abre o menu; nas demais, volta. */
   const isRoot = SIDEBAR_ROOTS.includes(pathname);
@@ -52,9 +38,6 @@ export default function Layout() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  /* Troca de rota limpa as ações da página anterior. */
-  useEffect(() => setActions(null), [pathname]);
 
   const ctx = useMemo(() => setActions, []);
 

@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { statusLabel, statusVariant } from '@/lib/status';
 import { clientProfilePath } from '@/lib/nav';
+import type { Diagnostic, ServiceOrder } from '@/api/types';
 
 const EMPTY = { diagnosticId: '', notes: '', expectedDeliveryDate: '' };
 
@@ -35,8 +36,8 @@ function toIsoOrNull(value: string): string | null {
 
 export default function ServiceOrders() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<any[] | null>(null);
-  const [diagnostics, setDiagnostics] = useState<any[]>([]);
+  const [orders, setOrders] = useState<ServiceOrder[] | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
 
@@ -204,32 +205,31 @@ export default function ServiceOrders() {
                 </TableCell>
               </TableRow>
             ) : (
-              orders.map((os) => (
+              orders.map((os) => {
+                const vehicle = os.diagnostic?.vehicle;
+                const client = vehicle?.client;
+                return (
                 <TableRow key={os.id}>
                   <TableCell>
-                    <PlateBadge plate={os.diagnostic?.vehicle?.plate} />
+                    <PlateBadge plate={vehicle?.plate} />
                     <span className="ml-2">
-                      {os.diagnostic?.vehicle?.brand} {os.diagnostic?.vehicle?.model}
+                      {vehicle?.brand} {vehicle?.model}
                     </span>
                   </TableCell>
                   <TableCell className="font-semibold text-t1">
-                    {os.diagnostic?.vehicle?.client?.id ? (
+                    {client?.id ? (
                       <button
                         type="button"
                         onClick={() =>
-                          navigate(
-                            clientProfilePath(os.diagnostic.vehicle.client.id, {
-                              vehicleId: os.diagnostic.vehicle.id,
-                            }),
-                          )
+                          navigate(clientProfilePath(client.id, { vehicleId: vehicle?.id }))
                         }
                         className="text-left underline-offset-4 transition-colors hover:text-primary hover:underline"
-                        title={`Abrir perfil de ${os.diagnostic.vehicle.client.name}`}
+                        title={`Abrir perfil de ${client.name}`}
                       >
-                        {os.diagnostic.vehicle.client.name}
+                        {client.name}
                       </button>
                     ) : (
-                      os.diagnostic?.vehicle?.client?.name
+                      client?.name
                     )}
                   </TableCell>
                   <TableCell className="max-w-[220px] truncate">{os.diagnostic?.description}</TableCell>
@@ -258,7 +258,8 @@ export default function ServiceOrders() {
                     </Select>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

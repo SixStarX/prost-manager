@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { parse } from 'csv-parse/sync';
+import { errorMessage } from '../common/errors';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ function parseRows(buffer: Buffer): Record<string, string>[] {
       trim: true,
       bom: true,
       relax_column_count: true,
-    }) as Record<string, string>[];
+    });
   } catch {
     throw new BadRequestException('Arquivo CSV inválido ou mal formatado.');
   }
@@ -48,18 +49,35 @@ export class IntegrationsService {
     const rows = parseRows(file.buffer);
     const errors: string[] = [];
     let imported = 0;
-    let skipped  = 0;
+    let skipped = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const lineNum = i + 2; // +2: header + 1-based
 
-      const name  = pick(row, 'nome', 'name', 'cliente', 'razao social', 'razaosocial');
-      const phone = pick(row, 'telefone', 'phone', 'celular', 'cel', 'fone', 'whatsapp');
+      const name = pick(
+        row,
+        'nome',
+        'name',
+        'cliente',
+        'razao social',
+        'razaosocial',
+      );
+      const phone = pick(
+        row,
+        'telefone',
+        'phone',
+        'celular',
+        'cel',
+        'fone',
+        'whatsapp',
+      );
       const email = pick(row, 'email', 'e-mail');
 
       if (!name) {
-        errors.push(`Linha ${lineNum}: campo "nome" ausente ou vazio — ignorado.`);
+        errors.push(
+          `Linha ${lineNum}: campo "nome" ausente ou vazio — ignorado.`,
+        );
         skipped++;
         continue;
       }
@@ -71,7 +89,9 @@ export class IntegrationsService {
 
       if (exists) {
         skipped++;
-        errors.push(`Linha ${lineNum}: cliente "${name}" já existe — ignorado.`);
+        errors.push(
+          `Linha ${lineNum}: cliente "${name}" já existe — ignorado.`,
+        );
         continue;
       }
 
@@ -80,8 +100,10 @@ export class IntegrationsService {
           data: { name, phone: phone || '—', email: email || null },
         });
         imported++;
-      } catch (e: any) {
-        errors.push(`Linha ${lineNum}: erro ao salvar "${name}" — ${e.message}`);
+      } catch (e) {
+        errors.push(
+          `Linha ${lineNum}: erro ao salvar "${name}" — ${errorMessage(e)}`,
+        );
         skipped++;
       }
     }
@@ -105,31 +127,51 @@ export class IntegrationsService {
     const rows = parseRows(file.buffer);
     const errors: string[] = [];
     let imported = 0;
-    let skipped  = 0;
+    let skipped = 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const lineNum = i + 2;
 
-      const plate  = pick(row, 'placa', 'plate');
-      const brand  = pick(row, 'marca', 'brand', 'fabricante');
-      const model  = pick(row, 'modelo', 'model');
-      const yearRaw= pick(row, 'ano', 'year', 'anofabricacao', 'ano fabricacao');
-      const cliName= pick(row, 'cliente', 'proprietario', 'owner', 'nome do cliente', 'nomecliente');
+      const plate = pick(row, 'placa', 'plate');
+      const brand = pick(row, 'marca', 'brand', 'fabricante');
+      const model = pick(row, 'modelo', 'model');
+      const yearRaw = pick(
+        row,
+        'ano',
+        'year',
+        'anofabricacao',
+        'ano fabricacao',
+      );
+      const cliName = pick(
+        row,
+        'cliente',
+        'proprietario',
+        'owner',
+        'nome do cliente',
+        'nomecliente',
+      );
 
       if (!plate) {
         errors.push(`Linha ${lineNum}: campo "placa" ausente — ignorado.`);
-        skipped++; continue;
+        skipped++;
+        continue;
       }
       if (!cliName) {
-        errors.push(`Linha ${lineNum}: campo "cliente/proprietário" ausente para placa "${plate}" — ignorado.`);
-        skipped++; continue;
+        errors.push(
+          `Linha ${lineNum}: campo "cliente/proprietário" ausente para placa "${plate}" — ignorado.`,
+        );
+        skipped++;
+        continue;
       }
 
       const year = parseInt(yearRaw, 10);
       if (isNaN(year)) {
-        errors.push(`Linha ${lineNum}: ano inválido "${yearRaw}" para placa "${plate}" — ignorado.`);
-        skipped++; continue;
+        errors.push(
+          `Linha ${lineNum}: ano inválido "${yearRaw}" para placa "${plate}" — ignorado.`,
+        );
+        skipped++;
+        continue;
       }
 
       const client = await this.prisma.client.findFirst({
@@ -137,25 +179,40 @@ export class IntegrationsService {
       });
 
       if (!client) {
-        errors.push(`Linha ${lineNum}: cliente "${cliName}" não encontrado para placa "${plate}". Importe os clientes primeiro.`);
-        skipped++; continue;
+        errors.push(
+          `Linha ${lineNum}: cliente "${cliName}" não encontrado para placa "${plate}". Importe os clientes primeiro.`,
+        );
+        skipped++;
+        continue;
       }
 
       // Evita duplicata por placa
-      const exists = await this.prisma.vehicle.findFirst({ where: { plate: { equals: plate } } });
+      const exists = await this.prisma.vehicle.findFirst({
+        where: { plate: { equals: plate } },
+      });
       if (exists) {
         skipped++;
-        errors.push(`Linha ${lineNum}: placa "${plate}" já cadastrada — ignorado.`);
+        errors.push(
+          `Linha ${lineNum}: placa "${plate}" já cadastrada — ignorado.`,
+        );
         continue;
       }
 
       try {
         await this.prisma.vehicle.create({
-          data: { plate: plate.toUpperCase(), brand: brand || '—', model: model || '—', year, clientId: client.id },
+          data: {
+            plate: plate.toUpperCase(),
+            brand: brand || '—',
+            model: model || '—',
+            year,
+            clientId: client.id,
+          },
         });
         imported++;
-      } catch (e: any) {
-        errors.push(`Linha ${lineNum}: erro ao salvar placa "${plate}" — ${e.message}`);
+      } catch (e) {
+        errors.push(
+          `Linha ${lineNum}: erro ao salvar placa "${plate}" — ${errorMessage(e)}`,
+        );
         skipped++;
       }
     }
@@ -178,52 +235,74 @@ export class IntegrationsService {
   // ── EXPORT ────────────────────────────────────────────────────
 
   async exportClients(): Promise<string> {
-    const clients = await this.prisma.client.findMany({ orderBy: { createdAt: 'asc' } });
+    const clients = await this.prisma.client.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
     const header = 'nome,telefone,email,cadastrado_em';
     const rows = clients.map((c) =>
-      [this.csv(c.name), this.csv(c.phone), this.csv(c.email ?? ''),
-       new Date(c.createdAt).toLocaleDateString('pt-BR')].join(',')
+      [
+        this.csv(c.name),
+        this.csv(c.phone),
+        this.csv(c.email ?? ''),
+        new Date(c.createdAt).toLocaleDateString('pt-BR'),
+      ].join(','),
     );
     return [header, ...rows].join('\n');
   }
 
   async exportVehicles(): Promise<string> {
     const vehicles = await this.prisma.vehicle.findMany({
-      include: { client: true }, orderBy: { createdAt: 'asc' }
+      include: { client: true },
+      orderBy: { createdAt: 'asc' },
     });
-    const header = 'placa,marca,modelo,ano,proprietario,email_proprietario,cadastrado_em';
+    const header =
+      'placa,marca,modelo,ano,proprietario,email_proprietario,cadastrado_em';
     const rows = vehicles.map((v) =>
-      [this.csv(v.plate), this.csv(v.brand), this.csv(v.model), v.year,
-       this.csv(v.client.name), this.csv(v.client.email ?? ''),
-       new Date(v.createdAt).toLocaleDateString('pt-BR')].join(',')
+      [
+        this.csv(v.plate),
+        this.csv(v.brand),
+        this.csv(v.model),
+        v.year,
+        this.csv(v.client.name),
+        this.csv(v.client.email ?? ''),
+        new Date(v.createdAt).toLocaleDateString('pt-BR'),
+      ].join(','),
     );
     return [header, ...rows].join('\n');
   }
 
   async exportServiceOrders(): Promise<string> {
     const orders = await this.prisma.serviceOrder.findMany({
-      include: { diagnostic: { include: { vehicle: { include: { client: true } } } } },
+      include: {
+        diagnostic: { include: { vehicle: { include: { client: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
     });
-    const header = 'id,status,diagnostico,observacoes,veiculo,placa,cliente,criado_em,atualizado_em';
-    const rows = orders.map((o) => [
-      o.id,
-      o.status,
-      this.csv(o.diagnostic.description),
-      this.csv(o.notes ?? ''),
-      this.csv(`${o.diagnostic.vehicle.brand} ${o.diagnostic.vehicle.model}`),
-      this.csv(o.diagnostic.vehicle.plate),
-      this.csv(o.diagnostic.vehicle.client.name),
-      new Date(o.createdAt).toLocaleDateString('pt-BR'),
-      new Date(o.updatedAt).toLocaleDateString('pt-BR'),
-    ].join(','));
+    const header =
+      'id,status,diagnostico,observacoes,veiculo,placa,cliente,criado_em,atualizado_em';
+    const rows = orders.map((o) =>
+      [
+        o.id,
+        o.status,
+        this.csv(o.diagnostic.description),
+        this.csv(o.notes ?? ''),
+        this.csv(`${o.diagnostic.vehicle.brand} ${o.diagnostic.vehicle.model}`),
+        this.csv(o.diagnostic.vehicle.plate),
+        this.csv(o.diagnostic.vehicle.client.name),
+        new Date(o.createdAt).toLocaleDateString('pt-BR'),
+        new Date(o.updatedAt).toLocaleDateString('pt-BR'),
+      ].join(','),
+    );
     return [header, ...rows].join('\n');
   }
 
   // ── HISTÓRICO ─────────────────────────────────────────────────
 
   async getImportHistory() {
-    return this.prisma.importJob.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+    return this.prisma.importJob.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 
   /** Escapa valor para CSV (envolve em aspas se contém vírgula ou aspas) */

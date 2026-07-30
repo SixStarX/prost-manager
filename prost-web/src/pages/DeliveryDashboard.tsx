@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Printer } from 'lucide-react';
 import api from '@/api';
-import { useHeaderActions } from '@/components/Layout';
+import { useHeaderActions } from '@/components/layout/header-actions';
 import { HeaderIconButton } from '@/components/layout/AppHeader';
 import { DeliveryBoard } from '@/components/dashboard/DeliveryBoard';
 import type { ChecklistSummary } from '@/lib/checklist';
+import type { DashboardSummary } from '@/api/types';
+import { usePollingResource } from '@/hooks/usePollingResource';
 import { clientProfilePath } from '@/lib/nav';
 
 /** Intervalo de atualização automática do quadro (ms). */
@@ -18,27 +20,17 @@ const REFRESH_MS = 30_000;
  */
 export default function DeliveryDashboard() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<ChecklistSummary[] | null>(null);
 
   useHeaderActions(
     <HeaderIconButton icon={Printer} title="Imprimir Semana" onClick={() => window.print()} />,
     [],
   );
 
-  const load = useCallback(async () => {
-    try {
-      const r = await api.get('/dashboard');
-      setItems(r.data.activeChecklists ?? []);
-    } catch {
-      setItems((prev) => prev ?? []);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [load]);
+  const fetchItems = useCallback(
+    () => api.get<DashboardSummary>('/dashboard').then((r) => r.data.activeChecklists ?? []),
+    [],
+  );
+  const { data: items } = usePollingResource(fetchItems, { intervalMs: REFRESH_MS });
 
   const openChecklist = useCallback(
     (c: ChecklistSummary) => {

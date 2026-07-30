@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,7 +37,8 @@ export class AuthService {
       },
     });
 
-    return user;
+    // Nunca devolver o hash da senha na resposta.
+    return { id: user.id, name: user.name, email: user.email };
   }
 
   async login(data: LoginDto) {

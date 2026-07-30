@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OiOrdemDeServico, OiItem, OiProduto, SyncResult } from './oi.types';
+import { errorMessage } from '../common/errors';
 
 const OI_BASE =
   'https://www.oiapi.com.br/ws/v2/IntegracaoOficinaInteligente.asmx';
@@ -28,17 +29,22 @@ function buildNotes(os: OiOrdemDeServico): string {
   const parts = [`OS OI #${os.OrdemDeServicoID}`];
   parts.push(`Total: R$ ${Number(os.ValorDaOrdemDeServico).toFixed(2)}`);
   if (os.KMDoVeiculo) parts.push(`KM: ${os.KMDoVeiculo}`);
-  if (os.CPFCNPJ)     parts.push(`CPF/CNPJ: ${os.CPFCNPJ}`);
+  if (os.CPFCNPJ) parts.push(`CPF/CNPJ: ${os.CPFCNPJ}`);
   return parts.join(' | ');
 }
 
 /** Parseia resposta .NET que pode vir como array direto ou envolta em { d: "..." } */
 function parseOiResponse<T>(text: string): T[] {
-  const raw = JSON.parse(text);
+  const raw: unknown = JSON.parse(text);
   if (Array.isArray(raw)) return raw as T[];
-  if (raw?.d) {
-    const inner = JSON.parse(raw.d);
-    return Array.isArray(inner) ? inner : [];
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'd' in raw &&
+    typeof raw.d === 'string'
+  ) {
+    const inner: unknown = JSON.parse(raw.d);
+    return Array.isArray(inner) ? (inner as T[]) : [];
   }
   return [];
 }
@@ -114,14 +120,16 @@ export class OiService {
           updated: 0,
           skipped: 0,
           status: 'FAILED',
-          errors: JSON.stringify([err.message]),
+          errors: JSON.stringify([errorMessage(err)]),
         },
       });
       throw err;
     }
 
     const errors: string[] = [];
-    let created = 0, updated = 0, skipped = 0;
+    let created = 0,
+      updated = 0,
+      skipped = 0;
 
     for (const os of ordensDeServico) {
       try {
@@ -134,9 +142,9 @@ export class OiService {
 
         if (existsBefore) updated++;
         else created++;
-      } catch (err: any) {
-        this.logger.error(`OS #${os.OrdemDeServicoID}: ${err.message}`);
-        errors.push(`OS #${os.OrdemDeServicoID}: ${err.message}`);
+      } catch (err) {
+        this.logger.error(`OS #${os.OrdemDeServicoID}: ${errorMessage(err)}`);
+        errors.push(`OS #${os.OrdemDeServicoID}: ${errorMessage(err)}`);
         skipped++;
       }
     }
@@ -171,14 +179,16 @@ export class OiService {
   }
 
   private async processOrdem(os: OiOrdemDeServico): Promise<void> {
-    const client  = await this.upsertClient(os);
+    const client = await this.upsertClient(os);
     const vehicle = await this.upsertVehicle(os, client.id);
 
-    const oiId   = String(os.OrdemDeServicoID);
+    const oiId = String(os.OrdemDeServicoID);
     const status = mapStatus(os.SituacaoDaOrdemDeServico);
-    const notes  = buildNotes(os);
+    const notes = buildNotes(os);
 
-    const existing = await this.prisma.serviceOrder.findFirst({ where: { oiId } });
+    const existing = await this.prisma.serviceOrder.findFirst({
+      where: { oiId },
+    });
 
     if (existing) {
       await this.prisma.serviceOrder.update({
@@ -187,7 +197,7 @@ export class OiService {
       });
     } else {
       const description = buildDescription(os.Itens);
-      const diagStatus  = status === 'DONE' ? 'DONE' : 'PENDING';
+      const diagStatus = status === 'DONE' ? 'DONE' : 'PENDING';
 
       const diagnostic = await this.prisma.diagnostic.create({
         data: { description, status: diagStatus, vehicleId: vehicle.id },
@@ -206,9 +216,9 @@ export class OiService {
   }
 
   private async upsertClient(os: OiOrdemDeServico) {
-    const name    = os.NomeDoCliente?.trim() || 'Cliente sem nome';
-    const phone   = os.Celular?.trim()       || '—';
-    const cpfcnpj = os.CPFCNPJ?.trim()      || null;
+    const name = os.NomeDoCliente?.trim() || 'Cliente sem nome';
+    const phone = os.Celular?.trim() || '—';
+    const cpfcnpj = os.CPFCNPJ?.trim() || null;
 
     // Prioridade 1: CPF/CNPJ
     if (cpfcnpj) {
@@ -250,7 +260,7 @@ export class OiService {
         plate,
         brand: '—',
         model: os.ModeloDoVeiculo?.trim() || '—',
-        year:  os.AnoDoVeiculo            || new Date().getFullYear(),
+        year: os.AnoDoVeiculo || new Date().getFullYear(),
         clientId,
       },
     });
