@@ -18,7 +18,11 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B5 — Hardening HTTP (audit/helmet/throttler/CORS) | ✅ **Concluído** | `e464382` |
 | B7 — Higiene do repositório | ✅ **Concluído** | (scaffolds removidos) |
 | B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
-| B6 — Infra (Docker/health/logs/backup) | 🟡 **Parcial** (health, logging e Docker prontos) | — |
+| B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
+
+**🎉 Fase 0 completa — todos os 7 bloqueadores resolvidos.** Restam apenas
+itens opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
+ambiente de vocês) e as Fases 1–2.
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -114,9 +118,9 @@ Cada item de reparo segue o mesmo formato:
   3. Mover as origens do CORS para env (`CORS_ORIGINS`) e incluir o domínio de produção do frontend.
 - **Esforço:** **S–M** (0,5–1,5d).
 
-## B6 — Infraestrutura mínima de produção  🟡 PARCIAL
-- **Feito:** `GET /health` público (checa o banco, isento de rate limit) · `server/Dockerfile` (multi-stage, non-root, HEALTHCHECK) · `prost-web/Dockerfile` + `nginx.conf` (SPA + proxy `/api`) · `docker-compose.yml` · `.dockerignore` · `console.log` do Prisma trocado por `Logger`.
-- **Pendente:** CI/CD (`.github/workflows/ci.yml`) · error tracking (Sentry) no back e no front · logging estruturado JSON (pino) · rotina de backup do MySQL + teste de restauração. (Já corrigido: `start:prod` agora aponta p/ `dist/src/main.js`.)
+## B6 — Infraestrutura mínima de produção  ✅ CONCLUÍDO
+- **Feito:** `GET /health` público (checa o banco, isento de rate limit) · `server/Dockerfile` (multi-stage, non-root, HEALTHCHECK) · `prost-web/Dockerfile` + `nginx.conf` (SPA + proxy `/api`) · `docker-compose.yml` · `.dockerignore` · `console.log` do Prisma trocado por `Logger` · **CI/CD** (`.github/workflows/ci.yml`: lint+build de server e web) · **Sentry** (error tracking no back via `@sentry/nestjs` e no front via `@sentry/react`, gated por DSN — no-op/tree-shaken sem config) · **backup** (`scripts/backup-db.sh` + `restore-db.sh`, dumps gitignored) · corrigido `start:prod` → `dist/src/main.js`.
+- **Opcional (Fase 2):** logs JSON estruturados (pino) · rodar o 1º backup e o teste de restauração no ambiente de produção (aqui não há `mysqldump`; a lógica de parse da URL foi validada).
 - **Severidade:** 🟠 Alto (operacional)
 - **Causa:** Não há Dockerfile, CI/CD, health check público, logging estruturado, monitoramento nem estratégia de backup.
 - **Impacto:** Deploy manual e frágil; falhas em produção passam despercebidas; sem recuperação de desastre.

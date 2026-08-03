@@ -1,3 +1,5 @@
+// Sentry: primeiro import, antes de qualquer módulo do Nest (instrumentação).
+import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';

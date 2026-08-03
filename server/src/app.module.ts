@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { ClientsModule } from './clients/clients.module';
@@ -17,6 +18,8 @@ import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
+    // Sentry primeiro (captura erros de toda a app). No-op sem SENTRY_DSN.
+    SentryModule.forRoot(),
     // Carrega o server/.env em process.env, de forma global, antes dos demais
     // módulos (o AuthModule depende de JWT_SECRET já estar disponível).
     ConfigModule.forRoot({ isGlobal: true }),
@@ -36,7 +39,12 @@ import { HealthModule } from './health/health.module';
     OiModule,
     HealthModule,
   ],
-  // Guard global de rate limiting (soma-se ao JwtAuthGuard do AuthModule).
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    // Captura exceções não tratadas e reporta ao Sentry (no-op sem DSN),
+    // depois deixa o Nest formatar a resposta normalmente.
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
+    // Guard global de rate limiting (soma-se ao JwtAuthGuard do AuthModule).
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
