@@ -37,13 +37,10 @@ export class WebhooksController {
     @Headers('x-oi-signature') signature?: string,
     @Headers('x-oi-event') eventHeader?: string,
   ) {
-    // Verificação de assinatura
-    const rawBody = req.rawBody;
-    if (rawBody) {
-      const valid = this.svc.verifySignature(rawBody, signature);
-      if (!valid)
-        throw new UnauthorizedException('Assinatura do webhook inválida.');
-    }
+    // Verificação de assinatura — sempre executada (fail-closed em produção).
+    const valid = this.svc.verifySignature(req.rawBody, signature);
+    if (!valid)
+      throw new UnauthorizedException('Assinatura do webhook inválida.');
 
     const event =
       eventHeader || body.event || body.tipo || body.type || 'unknown';

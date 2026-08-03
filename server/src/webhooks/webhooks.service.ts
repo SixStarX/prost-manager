@@ -11,10 +11,25 @@ export class WebhooksService {
   constructor(private prisma: PrismaService) {}
 
   /** Verifica assinatura HMAC-SHA256 da Oficina Inteligente */
-  verifySignature(rawBody: Buffer, signature: string | undefined): boolean {
+  verifySignature(
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+  ): boolean {
     const secret = process.env.OI_WEBHOOK_SECRET;
-    if (!secret) return true; // Se não configurado, aceita tudo (dev mode)
-    if (!signature) return false;
+    if (!secret) {
+      // Fail-closed em produção: sem segredo, nenhum webhook é aceito.
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error(
+          'OI_WEBHOOK_SECRET ausente em produção — webhook recusado.',
+        );
+        return false;
+      }
+      this.logger.warn(
+        'OI_WEBHOOK_SECRET não configurado — aceitando sem verificação (apenas fora de produção).',
+      );
+      return true;
+    }
+    if (!rawBody || !signature) return false;
 
     const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
 
@@ -23,7 +38,11 @@ export class WebhooksService {
       : signature;
 
     try {
-      return timingSafeEqual(Buffer.from(expected), Buffer.from(sigPart));
+      const a = Buffer.from(expected);
+      const b = Buffer.from(sigPart);
+      // timingSafeEqual exige buffers do mesmo tamanho.
+      if (a.length !== b.length) return false;
+      return timingSafeEqual(a, b);
     } catch {
       return false;
     }

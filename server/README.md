@@ -80,6 +80,25 @@ curl -X POST http://localhost:3000/auth/register \
 > Alteração de schema: o default de `User.role` passou de `ADMIN` para `USER`.
 > Aplique com `npx prisma db push` (usuários já existentes não são afetados).
 
+## Ingestão externa (coletor & webhooks)
+
+Dois endpoints recebem dados de origem externa (sem JWT) e por isso usam
+segredos próprios. Ambos são **fail-closed em produção** (`NODE_ENV=production`):
+sem o segredo configurado, a requisição é recusada.
+
+| Endpoint | Autenticação | Variável |
+|---|---|---|
+| `POST /oi/scrape` (bookmarklet) | Header `X-Collector-Token` | `COLLECTOR_TOKEN` |
+| `POST /webhooks/oficina-inteligente` | Assinatura HMAC `X-OI-Signature` | `OI_WEBHOOK_SECRET` |
+
+- **Coletor:** o token é obtido pelo frontend em `GET /oi/collector-token`
+  (exige login) e embutido no bookmarklet. Gere um valor com
+  `openssl rand -hex 24` e coloque em `COLLECTOR_TOKEN`.
+- **Webhook:** configure o mesmo `OI_WEBHOOK_SECRET` no painel da Oficina
+  Inteligente; a assinatura é verificada com `timingSafeEqual`.
+- Fora de produção, se a variável estiver vazia, a verificação é ignorada
+  (apenas para facilitar o desenvolvimento local) e um aviso é logado.
+
 ## Project setup
 
 ```bash

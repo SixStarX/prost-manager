@@ -4,8 +4,10 @@ import {
   Get,
   Query,
   Body,
+  Headers,
   HttpCode,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { OiService } from './oi.service';
 import { OiScrapeService } from './oi-scrape.service';
@@ -24,11 +26,31 @@ export class OiController {
    * bookmarklet dentro do painel da Oficina Inteligente.
    */
   // Recebido do bookmarklet, que roda no painel da OI (origem externa, sem JWT).
+  // Autenticado por um token compartilhado (X-Collector-Token), embutido no
+  // bookmarklet gerado por um usuário já logado — bloqueia escrita anônima.
   @Public()
   @Post('scrape')
   @HttpCode(200)
-  ingestScrape(@Body() payload: ScrapePayload) {
+  ingestScrape(
+    @Body() payload: ScrapePayload,
+    @Headers('x-collector-token') token?: string,
+  ) {
+    if (!this.scrape.isCollectorTokenValid(token)) {
+      throw new UnauthorizedException(
+        'Coletor não autorizado: token ausente ou inválido.',
+      );
+    }
     return this.scrape.ingest(payload);
+  }
+
+  /**
+   * GET /oi/collector-token — devolve o token compartilhado do coletor.
+   * Exige login (não é `@Public`): só um usuário autenticado gera o bookmarklet.
+   */
+  @Get('collector-token')
+  getCollectorToken() {
+    const token = process.env.COLLECTOR_TOKEN ?? '';
+    return { token, configured: token.length > 0 };
   }
 
   /** GET /oi/status — token configurado + última sync */

@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import api from '@/api';
 import { buildBookmarklet } from '@/lib/oi-collector';
 import type { OiSyncJob } from './types';
 import { fmtDate } from './format';
@@ -18,20 +19,37 @@ import { SyncStatusBadge } from './ui';
 export function CollectorTab() {
   const linkRef = useRef<HTMLAnchorElement>(null);
   const [history, setHistory] = useState<OiSyncJob[]>([]);
+  const [bookmarklet, setBookmarklet] = useState('');
 
   // Backend roda na porta 3000; o bookmarklet (fora do app) precisa do endereço absoluto.
   const apiUrl = `${window.location.protocol}//${window.location.hostname}:3000/oi/scrape`;
-  const bookmarklet = buildBookmarklet(apiUrl);
+
+  // Busca o token do coletor (autenticado) e embute-o no bookmarklet. Sem o
+  // token, o backend recusa a coleta em produção — evita escrita anônima.
+  useEffect(() => {
+    let active = true;
+    api
+      .get<{ token: string }>('/oi/collector-token')
+      .then((r) => {
+        if (active) setBookmarklet(buildBookmarklet(apiUrl, r.data?.token ?? ''));
+      })
+      .catch(() => {
+        if (active) setBookmarklet(buildBookmarklet(apiUrl, ''));
+      });
+    return () => {
+      active = false;
+    };
+  }, [apiUrl]);
 
   // React sanitiza href="javascript:..."; injetamos via setAttribute para preservar o bookmarklet.
   useEffect(() => {
-    if (linkRef.current) linkRef.current.setAttribute('href', bookmarklet);
+    if (linkRef.current && bookmarklet) linkRef.current.setAttribute('href', bookmarklet);
   }, [bookmarklet]);
 
   useEffect(() => {
-    fetch('/api/oi/history?limit=10')
-      .then((r) => r.json())
-      .then((all: OiSyncJob[]) => setHistory(all.filter((j) => j.source === 'scrape')))
+    api
+      .get<OiSyncJob[]>('/oi/history?limit=10')
+      .then((r) => setHistory(r.data.filter((j) => j.source === 'scrape')))
       .catch(() => {});
   }, []);
 
