@@ -25,6 +25,89 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Autenticação & criação de usuários
+
+O registro **não é público**. Toda a API exige JWT (guard global), exceto o
+login e os endpoints de ingestão externa marcados com `@Public()`.
+
+Fluxo de criação de usuários:
+
+```
+POST /auth/login  →  JWT válido  →  papel ADMIN  →  POST /auth/register
+```
+
+- **Sem token** em `POST /auth/register` → `401 Unauthorized`.
+- **Token de usuário comum** (`USER`) → `403 Forbidden`.
+- **Token de ADMIN** → cria o usuário. O corpo aceita `role` opcional
+  (`ADMIN` | `USER`); omitido, cria um `USER` (menor privilégio).
+
+### Primeiro administrador (seed)
+
+Como o registro deixou de ser aberto, o ADMIN inicial é criado por um seed
+**idempotente** (só cria se ainda não houver nenhum ADMIN):
+
+```bash
+# defina as credenciais no server/.env (ou inline) e rode:
+ADMIN_BOOTSTRAP_EMAIL=admin@prost.com \
+ADMIN_BOOTSTRAP_PASSWORD=umaSenhaForte \
+npm run seed
+```
+
+Variáveis (ver `.env.example`):
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `ADMIN_BOOTSTRAP_EMAIL` | sim | E-mail do primeiro admin |
+| `ADMIN_BOOTSTRAP_PASSWORD` | sim | Senha (mín. 8 caracteres) |
+| `ADMIN_BOOTSTRAP_NAME` | não | Nome exibido (padrão: "Administrador") |
+
+Depois de criado o primeiro admin, novos usuários são criados por ele via
+`POST /auth/register`. Exemplo:
+
+```bash
+# 1) login do admin
+TOKEN=$(curl -s -X POST http://localhost:3000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@prost.com","password":"umaSenhaForte"}' | jq -r .token)
+
+# 2) admin cria um usuário comum
+curl -X POST http://localhost:3000/auth/register \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Operador","email":"op@prost.com","password":"outraSenha8","role":"USER"}'
+```
+
+> Alteração de schema: o default de `User.role` passou de `ADMIN` para `USER`.
+> Aplique com `npx prisma db push` (usuários já existentes não são afetados).
+
+## Ingestão externa (coletor & webhooks)
+
+Dois endpoints recebem dados de origem externa (sem JWT) e por isso usam
+segredos próprios. Ambos são **fail-closed em produção** (`NODE_ENV=production`):
+sem o segredo configurado, a requisição é recusada.
+
+| Endpoint | Autenticação | Variável |
+|---|---|---|
+| `POST /oi/scrape` (bookmarklet) | Header `X-Collector-Token` | `COLLECTOR_TOKEN` |
+| `POST /webhooks/oficina-inteligente` | Assinatura HMAC `X-OI-Signature` | `OI_WEBHOOK_SECRET` |
+
+- **Coletor:** o token é obtido pelo frontend em `GET /oi/collector-token`
+  (exige login) e embutido no bookmarklet. Gere um valor com
+  `openssl rand -hex 24` e coloque em `COLLECTOR_TOKEN`.
+- **Webhook:** configure o mesmo `OI_WEBHOOK_SECRET` no painel da Oficina
+  Inteligente; a assinatura é verificada com `timingSafeEqual`.
+- Fora de produção, se a variável estiver vazia, a verificação é ignorada
+  (apenas para facilitar o desenvolvimento local) e um aviso é logado.
+
+## Hardening HTTP
+
+- **Helmet** aplica cabeçalhos de segurança em todas as respostas.
+- **Rate limiting** (`@nestjs/throttler`): 120 req/min por IP no geral e
+  **8 tentativas/min** no `POST /auth/login` (anti brute-force). O storage é em
+  memória — para múltiplas instâncias, migrar para um storage compartilhado (Redis).
+- **CORS** por ambiente: defina `CORS_ORIGINS` (lista separada por vírgula) com
+  o domínio do frontend de produção.
+
 ## Project setup
 
 ```bash

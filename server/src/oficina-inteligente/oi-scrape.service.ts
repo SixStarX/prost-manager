@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { errorMessage } from '../common/errors';
 
@@ -95,6 +96,36 @@ export class OiScrapeService {
   private readonly logger = new Logger(OiScrapeService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Valida o token compartilhado do coletor (header `X-Collector-Token`).
+   * Fail-closed em produção: sem `COLLECTOR_TOKEN` configurado, nada é aceito.
+   * Fora de produção, se não houver token configurado, libera (dev local).
+   */
+  isCollectorTokenValid(token: string | undefined): boolean {
+    const expected = process.env.COLLECTOR_TOKEN;
+    if (!expected) {
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error(
+          'COLLECTOR_TOKEN ausente em produção — coleta recusada.',
+        );
+        return false;
+      }
+      this.logger.warn(
+        'COLLECTOR_TOKEN não configurado — aceitando coleta sem token (apenas fora de produção).',
+      );
+      return true;
+    }
+    if (!token) return false;
+    const a = Buffer.from(token);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    try {
+      return timingSafeEqual(a, b);
+    } catch {
+      return false;
+    }
+  }
 
   async ingest(payload: ScrapePayload): Promise<ScrapeResult> {
     const { kind, headers, rows } = payload;

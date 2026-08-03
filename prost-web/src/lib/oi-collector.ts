@@ -77,7 +77,7 @@ export const COLLECTOR_SOURCE = String.raw`
     btn.textContent = "Enviando...";
     fetch(API, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Collector-Token": "{{TOKEN}}" },
       body: JSON.stringify({ kind: kind, headers: data.headers, rows: data.rows })
     })
     .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
@@ -149,9 +149,14 @@ export const COLLECTOR_SOURCE = String.raw`
 })();
 `;
 
-/** Gera a string javascript: do bookmarklet, embutindo a URL do backend. */
-export function buildBookmarklet(apiUrl: string): string {
-  const code = COLLECTOR_SOURCE.replace('{{API_URL}}', apiUrl)
+/**
+ * Gera a string javascript: do bookmarklet, embutindo a URL do backend e o
+ * token compartilhado do coletor. As substituições usam função para não
+ * interpretar `$` do token como padrão de replacement.
+ */
+export function buildBookmarklet(apiUrl: string, token = ''): string {
+  const code = COLLECTOR_SOURCE.replace('{{API_URL}}', () => apiUrl)
+    .replace('{{TOKEN}}', () => token)
     .replace(/\n\s*/g, ' ') // achata em uma linha (seguro: sem comentários //)
     .trim();
   return 'javascript:' + encodeURIComponent(code);
