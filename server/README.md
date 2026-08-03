@@ -99,6 +99,36 @@ sem o segredo configurado, a requisição é recusada.
 - Fora de produção, se a variável estiver vazia, a verificação é ignorada
   (apenas para facilitar o desenvolvimento local) e um aviso é logado.
 
+## Banco de dados (migrations)
+
+O schema é versionado com **Prisma Migrate**. Em produção **não use mais `db push`**.
+
+**Aplicar em produção** (não precisa de shadow DB):
+
+```bash
+npm run migrate:deploy   # prisma migrate deploy
+```
+
+**Adoção inicial (baseline) — rodar UMA única vez.** O banco atual foi criado com
+`db push` e não tem histórico; estes passos adotam migrations sem recriar as
+tabelas (que já têm dados):
+
+```bash
+# 1) sincroniza a última mudança pendente (default de User.role -> USER)
+npx prisma db push
+# 2) marca a migration base como já aplicada (NÃO recria as tabelas)
+npx prisma migrate resolve --applied 0_init
+# 3) confirma o estado
+npm run migrate:status
+```
+
+**Criar novas migrations (dev).** `migrate dev` exige um shadow DB; como o MySQL
+remoto o bloqueia, use um **MySQL local** via `SHADOW_DATABASE_URL`:
+
+```bash
+npx prisma migrate dev --name minha_mudanca --shadow-database-url "$SHADOW_DATABASE_URL"
+```
+
 ## Hardening HTTP
 
 - **Helmet** aplica cabeçalhos de segurança em todas as respostas.
