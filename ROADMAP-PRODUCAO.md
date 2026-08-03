@@ -16,7 +16,8 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B2 — Autorização por papel (RolesGuard) | ✅ **Concluído** | `dd9c40c` |
 | B3 — Proteger `/oi/scrape` + webhook | ✅ **Concluído** | `55692a4` |
 | B5 — Hardening HTTP (audit/helmet/throttler/CORS) | ✅ **Concluído** | `e464382` |
-| B4 — Migrations · B6 — Infra · B7 — Higiene do repo | ⏳ Pendente | — |
+| B7 — Higiene do repositório | ✅ **Concluído** | (scaffolds removidos) |
+| B4 — Migrations · B6 — Infra | ⏳ Pendente | — |
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -122,8 +123,9 @@ Cada item de reparo segue o mesmo formato:
   5. **Backup:** rotina de dump do MySQL (diária) + teste de restauração documentado.
 - **Esforço:** **L** (3–5d).
 
-## B7 — Higienizar o repositório e versionar o código
+## B7 — Higienizar o repositório e versionar o código  ✅ CONCLUÍDO
 - **Severidade:** 🟡 Médio (mas trivial e essencial para deploy correto)
+- **O que foi feito:** removidos os scaffolds abandonados da raiz (`src/`, `app.module.ts`, `package.json`, `package-lock.json`, `node_modules/`, `prost/`) e o diretório-lixo `prost-web/prost-web/`; regras obsoletas retiradas do `.gitignore`. Verificado: todo o código real está commitado (server/src 60/60, prost-web/src 81 rastreados), nenhum fonte foi ignorado por engano e o `server/.env` não vaza. Backup dos scaffolds guardado fora do repo.
 - **Causa:** Há muitos arquivos **untracked** (ex.: `server/src/auth/jwt.strategy.ts`, `server/src/common/`, `prost-web/src/hooks/`, `prost-web/src/lib/errors.ts`), scaffolds legados na raiz (`src/`, `app.module.ts`, `package.json`, `prost/`) e um diretório-lixo `prost-web/prost-web/`.
 - **Impacto:** Código que funciona localmente **não está no git** — risco de deploy incompleto e de perda. O lixo confunde qualquer automação de build.
 - **Arquivos:** raiz do repo, `prost-web/prost-web/`
