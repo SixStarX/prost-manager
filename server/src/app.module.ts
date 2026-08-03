@@ -13,6 +13,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { OiModule } from './oficina-inteligente/oi.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { OiModule } from './oficina-inteligente/oi.module';
     IntegrationsModule,
     WebhooksModule,
     OiModule,
+    HealthModule,
   ],
   // Guard global de rate limiting (soma-se ao JwtAuthGuard do AuthModule).
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

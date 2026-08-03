@@ -17,8 +17,8 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B3 — Proteger `/oi/scrape` + webhook | ✅ **Concluído** | `55692a4` |
 | B5 — Hardening HTTP (audit/helmet/throttler/CORS) | ✅ **Concluído** | `e464382` |
 | B7 — Higiene do repositório | ✅ **Concluído** | (scaffolds removidos) |
-| B4 — Migrations (Prisma Migrate) | 🟡 **Infra pronta** · ativação em prod pendente | (baseline `0_init`) |
-| B6 — Infra (Docker/health/logs/backup) | ⏳ Pendente | — |
+| B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
+| B6 — Infra (Docker/health/logs/backup) | 🟡 **Parcial** (health, logging e Docker prontos) | — |
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -88,14 +88,11 @@ Cada item de reparo segue o mesmo formato:
   3. Adicionar rate limiting específico nesses endpoints (ver B5).
 - **Esforço:** **S–M** (0,5–1,5d).
 
-## B4 — Adotar migrations de banco (sair do `db push`)  🟡 INFRA PRONTA (ativação em prod pendente)
+## B4 — Adotar migrations de banco (sair do `db push`)  ✅ CONCLUÍDO
 - **Severidade:** 🔴 Crítico (operacional)
-- **O que foi feito:** criada a migration base `prisma/migrations/0_init/migration.sql` (9 tabelas, FKs e índices) + `migration_lock.toml`; scripts `migrate:dev|deploy|status`; `SHADOW_DATABASE_URL` no `.env.example` e workflow documentado no README. Drift check confirmou que o DB de produção só difere no default de `role` (ainda `ADMIN`).
-- **Ativação (rodar UMA vez em produção — toca o banco, por isso deixado sob confirmação):**
-  1. `npx prisma db push` (sincroniza o default `role -> USER`; dados existentes intactos)
-  2. `npx prisma migrate resolve --applied 0_init` (baseline; não recria tabelas)
-  3. `npm run migrate:status` (confirma)
-  Depois disso, todo deploy usa `npm run migrate:deploy`.
+- **O que foi feito:** criada a migration base `prisma/migrations/0_init/migration.sql` (9 tabelas, FKs e índices) + `migration_lock.toml`; scripts `migrate:dev|deploy|status`; `SHADOW_DATABASE_URL` no `.env.example` e workflow documentado no README.
+- **Ativação em produção (executada):** `prisma db push` sincronizou o default `role -> USER`; `prisma migrate resolve --applied 0_init` fez o baseline (sem recriar tabelas); `migrate status` confirmou **"Database schema is up to date!"**. O banco agora tem histórico de migrations.
+- **Daqui em diante:** todo deploy aplica migrations com `npm run migrate:deploy`; novas mudanças de schema via `npm run migrate:dev` (usa MySQL local como shadow).
 - **Causa:** O schema é aplicado com `prisma db push` (o MySQL remoto bloqueia o shadow DB usado pelo `migrate`). Não há histórico de schema nem rollback.
 - **Impacto:** Em produção, qualquer alteração de schema corre risco de **drift** e de **perda de dados** sem trilha de auditoria nem reversão.
 - **Arquivos:** `server/prisma/schema.prisma`, novo diretório `server/prisma/migrations/`
@@ -117,7 +114,9 @@ Cada item de reparo segue o mesmo formato:
   3. Mover as origens do CORS para env (`CORS_ORIGINS`) e incluir o domínio de produção do frontend.
 - **Esforço:** **S–M** (0,5–1,5d).
 
-## B6 — Infraestrutura mínima de produção
+## B6 — Infraestrutura mínima de produção  🟡 PARCIAL
+- **Feito:** `GET /health` público (checa o banco, isento de rate limit) · `server/Dockerfile` (multi-stage, non-root, HEALTHCHECK) · `prost-web/Dockerfile` + `nginx.conf` (SPA + proxy `/api`) · `docker-compose.yml` · `.dockerignore` · `console.log` do Prisma trocado por `Logger`.
+- **Pendente:** CI/CD (`.github/workflows/ci.yml`) · error tracking (Sentry) no back e no front · logging estruturado JSON (pino) · rotina de backup do MySQL + teste de restauração. (Já corrigido: `start:prod` agora aponta p/ `dist/src/main.js`.)
 - **Severidade:** 🟠 Alto (operacional)
 - **Causa:** Não há Dockerfile, CI/CD, health check público, logging estruturado, monitoramento nem estratégia de backup.
 - **Impacto:** Deploy manual e frágil; falhas em produção passam despercebidas; sem recuperação de desastre.

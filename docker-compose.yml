@@ -1,0 +1,31 @@
+# Orquestração de produção do PROST Manager.
+# O banco é MySQL remoto (via DATABASE_URL no server/.env), então não há serviço
+# de DB aqui. Suba com:  docker compose up -d --build
+services:
+  server:
+    build: ./server
+    env_file: ./server/.env          # segredos reais (gitignored)
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web:
+    build: ./prost-web
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
