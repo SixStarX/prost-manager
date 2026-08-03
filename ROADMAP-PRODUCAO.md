@@ -149,15 +149,15 @@ Cada item de reparo segue o mesmo formato:
 
 # 🟠 FASE 1 — Endurecimento (logo antes ou na 1ª semana)
 
-## H1 — Error Boundary no frontend
+## H1 — Error Boundary no frontend  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** S
 - **Causa/Impacto:** Sem `ErrorBoundary` do React, uma exceção de render leva o app à tela branca.
-- **Ação:** Envolver as rotas com um `ErrorBoundary` com fallback amigável e botão de recarregar. Arquivo: `prost-web/src/App.tsx`.
+- **Feito:** `prost-web/src/components/ErrorBoundary.tsx` (fallback amigável no tema, botão recarregar) envolvendo as rotas no `App.tsx`. Verificado no browser: render normal OK e, ao forçar um erro, o fallback aparece no lugar da tela branca.
 
-## H2 — Índices de banco nas colunas consultadas
+## H2 — Índices de banco nas colunas consultadas  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** S
-- **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj`, `Diagnostic.vehicleId` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
-- **Ação:** Adicionar `@@index` no `schema.prisma` e aplicar via migration (B4). Considerar unicidade em `Vehicle.plate` e `Client.cpfcnpj`.
+- **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
+- **Feito:** `@@index` em `Client.name`, `Client.cpfcnpj` e `Vehicle.plate` (colunas não-FK; as FK já têm índice automático no MySQL). Migration `20260803190000_add_query_indexes` **aplicada em produção** via `migrate deploy` — 3/3 índices confirmados no banco. (Unicidade em placa/cpfcnpj foi adiada: exige checagem/limpeza de duplicados antes, senão o índice único falha.)
 
 ## H3 — Sessão mais robusta (JWT)
 - **Prioridade:** 🟡 Médio · **Esforço:** M
