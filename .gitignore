@@ -6,6 +6,10 @@ node_modules/
 .env.*
 !.env.example
 
+# Backups de banco (contêm dados/PII — nunca versionar)
+backups/
+*.sql.gz
+
 # Build
 dist/
 build/

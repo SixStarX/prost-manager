@@ -129,6 +129,23 @@ remoto o bloqueia, use um **MySQL local** via `SHADOW_DATABASE_URL`:
 npx prisma migrate dev --name minha_mudanca --shadow-database-url "$SHADOW_DATABASE_URL"
 ```
 
+## Backup & restauração do banco
+
+Scripts em [`scripts/`](../scripts) (rodam onde houver `mysqldump`/`mysql` — Linux,
+CI, container). Usam a `DATABASE_URL` (parse robusto via node, lida com senha
+URL-encoded). Os dumps são gitignored (contêm dados pessoais).
+
+```bash
+# Backup (dump consistente, comprimido, datado, com rotação de 14 dias)
+DATABASE_URL="mysql://user:pass@host:3306/prostm" ./scripts/backup-db.sh ./backups
+
+# Restauração (pede confirmação; use um banco de TESTE, não produção)
+DATABASE_URL="mysql://user:pass@host:3306/prostm_teste" ./scripts/restore-db.sh ./backups/prostm-<ts>.sql.gz
+```
+
+Recomendado: agendar `backup-db.sh` via cron (diário) e **testar a restauração**
+periodicamente num banco de teste. Guarde os dumps em local seguro/criptografado.
+
 ## Hardening HTTP
 
 - **Helmet** aplica cabeçalhos de segurança em todas as respostas.
