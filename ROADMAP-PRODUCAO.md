@@ -16,7 +16,13 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B2 — Autorização por papel (RolesGuard) | ✅ **Concluído** | `dd9c40c` |
 | B3 — Proteger `/oi/scrape` + webhook | ✅ **Concluído** | `55692a4` |
 | B5 — Hardening HTTP (audit/helmet/throttler/CORS) | ✅ **Concluído** | `e464382` |
-| B4 — Migrations · B6 — Infra · B7 — Higiene do repo | ⏳ Pendente | — |
+| B7 — Higiene do repositório | ✅ **Concluído** | (scaffolds removidos) |
+| B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
+| B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
+
+**🎉 Fase 0 completa — todos os 7 bloqueadores resolvidos.** Restam apenas
+itens opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
+ambiente de vocês) e as Fases 1–2.
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -86,8 +92,11 @@ Cada item de reparo segue o mesmo formato:
   3. Adicionar rate limiting específico nesses endpoints (ver B5).
 - **Esforço:** **S–M** (0,5–1,5d).
 
-## B4 — Adotar migrations de banco (sair do `db push`)
+## B4 — Adotar migrations de banco (sair do `db push`)  ✅ CONCLUÍDO
 - **Severidade:** 🔴 Crítico (operacional)
+- **O que foi feito:** criada a migration base `prisma/migrations/0_init/migration.sql` (9 tabelas, FKs e índices) + `migration_lock.toml`; scripts `migrate:dev|deploy|status`; `SHADOW_DATABASE_URL` no `.env.example` e workflow documentado no README.
+- **Ativação em produção (executada):** `prisma db push` sincronizou o default `role -> USER`; `prisma migrate resolve --applied 0_init` fez o baseline (sem recriar tabelas); `migrate status` confirmou **"Database schema is up to date!"**. O banco agora tem histórico de migrations.
+- **Daqui em diante:** todo deploy aplica migrations com `npm run migrate:deploy`; novas mudanças de schema via `npm run migrate:dev` (usa MySQL local como shadow).
 - **Causa:** O schema é aplicado com `prisma db push` (o MySQL remoto bloqueia o shadow DB usado pelo `migrate`). Não há histórico de schema nem rollback.
 - **Impacto:** Em produção, qualquer alteração de schema corre risco de **drift** e de **perda de dados** sem trilha de auditoria nem reversão.
 - **Arquivos:** `server/prisma/schema.prisma`, novo diretório `server/prisma/migrations/`
@@ -109,7 +118,9 @@ Cada item de reparo segue o mesmo formato:
   3. Mover as origens do CORS para env (`CORS_ORIGINS`) e incluir o domínio de produção do frontend.
 - **Esforço:** **S–M** (0,5–1,5d).
 
-## B6 — Infraestrutura mínima de produção
+## B6 — Infraestrutura mínima de produção  ✅ CONCLUÍDO
+- **Feito:** `GET /health` público (checa o banco, isento de rate limit) · `server/Dockerfile` (multi-stage, non-root, HEALTHCHECK) · `prost-web/Dockerfile` + `nginx.conf` (SPA + proxy `/api`) · `docker-compose.yml` · `.dockerignore` · `console.log` do Prisma trocado por `Logger` · **CI/CD** (`.github/workflows/ci.yml`: lint+build de server e web) · **Sentry** (error tracking no back via `@sentry/nestjs` e no front via `@sentry/react`, gated por DSN — no-op/tree-shaken sem config) · **backup** (`scripts/backup-db.sh` + `restore-db.sh`, dumps gitignored) · corrigido `start:prod` → `dist/src/main.js`.
+- **Opcional (Fase 2):** logs JSON estruturados (pino) · rodar o 1º backup e o teste de restauração no ambiente de produção (aqui não há `mysqldump`; a lógica de parse da URL foi validada).
 - **Severidade:** 🟠 Alto (operacional)
 - **Causa:** Não há Dockerfile, CI/CD, health check público, logging estruturado, monitoramento nem estratégia de backup.
 - **Impacto:** Deploy manual e frágil; falhas em produção passam despercebidas; sem recuperação de desastre.
@@ -122,8 +133,9 @@ Cada item de reparo segue o mesmo formato:
   5. **Backup:** rotina de dump do MySQL (diária) + teste de restauração documentado.
 - **Esforço:** **L** (3–5d).
 
-## B7 — Higienizar o repositório e versionar o código
+## B7 — Higienizar o repositório e versionar o código  ✅ CONCLUÍDO
 - **Severidade:** 🟡 Médio (mas trivial e essencial para deploy correto)
+- **O que foi feito:** removidos os scaffolds abandonados da raiz (`src/`, `app.module.ts`, `package.json`, `package-lock.json`, `node_modules/`, `prost/`) e o diretório-lixo `prost-web/prost-web/`; regras obsoletas retiradas do `.gitignore`. Verificado: todo o código real está commitado (server/src 60/60, prost-web/src 81 rastreados), nenhum fonte foi ignorado por engano e o `server/.env` não vaza. Backup dos scaffolds guardado fora do repo.
 - **Causa:** Há muitos arquivos **untracked** (ex.: `server/src/auth/jwt.strategy.ts`, `server/src/common/`, `prost-web/src/hooks/`, `prost-web/src/lib/errors.ts`), scaffolds legados na raiz (`src/`, `app.module.ts`, `package.json`, `prost/`) e um diretório-lixo `prost-web/prost-web/`.
 - **Impacto:** Código que funciona localmente **não está no git** — risco de deploy incompleto e de perda. O lixo confunde qualquer automação de build.
 - **Arquivos:** raiz do repo, `prost-web/prost-web/`
@@ -137,15 +149,15 @@ Cada item de reparo segue o mesmo formato:
 
 # 🟠 FASE 1 — Endurecimento (logo antes ou na 1ª semana)
 
-## H1 — Error Boundary no frontend
+## H1 — Error Boundary no frontend  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** S
 - **Causa/Impacto:** Sem `ErrorBoundary` do React, uma exceção de render leva o app à tela branca.
-- **Ação:** Envolver as rotas com um `ErrorBoundary` com fallback amigável e botão de recarregar. Arquivo: `prost-web/src/App.tsx`.
+- **Feito:** `prost-web/src/components/ErrorBoundary.tsx` (fallback amigável no tema, botão recarregar) envolvendo as rotas no `App.tsx`. Verificado no browser: render normal OK e, ao forçar um erro, o fallback aparece no lugar da tela branca.
 
-## H2 — Índices de banco nas colunas consultadas
+## H2 — Índices de banco nas colunas consultadas  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** S
-- **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj`, `Diagnostic.vehicleId` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
-- **Ação:** Adicionar `@@index` no `schema.prisma` e aplicar via migration (B4). Considerar unicidade em `Vehicle.plate` e `Client.cpfcnpj`.
+- **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
+- **Feito:** `@@index` em `Client.name`, `Client.cpfcnpj` e `Vehicle.plate` (colunas não-FK; as FK já têm índice automático no MySQL). Migration `20260803190000_add_query_indexes` **aplicada em produção** via `migrate deploy` — 3/3 índices confirmados no banco. (Unicidade em placa/cpfcnpj foi adiada: exige checagem/limpeza de duplicados antes, senão o índice único falha.)
 
 ## H3 — Sessão mais robusta (JWT)
 - **Prioridade:** 🟡 Médio · **Esforço:** M

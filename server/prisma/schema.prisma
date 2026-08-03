@@ -52,6 +52,11 @@ model Client {
 
   vehicles   Vehicle[]
   checklists Checklist[]
+
+  // Consultados por findFirst na sincronização (scrape/webhook) — não são FK,
+  // então precisam de índice explícito para evitar full scan.
+  @@index([name])
+  @@index([cpfcnpj])
 }
 
 model Vehicle {
@@ -74,6 +79,9 @@ model Vehicle {
 
   diagnostics Diagnostic[]
   checklists  Checklist[]
+
+  // Consultado por findFirst na sincronização (upsert por placa) — precisa de índice.
+  @@index([plate])
 }
 
 // ── Checklist / Vistoria de veículo ──────────────────────────
