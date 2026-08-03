@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -24,8 +25,12 @@ export class AuthController {
     return this.authService.register(body);
   }
 
-  /** POST /auth/login — único endpoint de autenticação aberto. */
+  /**
+   * POST /auth/login — único endpoint de autenticação aberto.
+   * Limite estrito (8 tentativas/min por IP) para conter brute-force.
+   */
   @Public()
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Post('login')
   login(@Body() body: LoginDto) {
     return this.authService.login(body);

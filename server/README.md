@@ -99,6 +99,15 @@ sem o segredo configurado, a requisição é recusada.
 - Fora de produção, se a variável estiver vazia, a verificação é ignorada
   (apenas para facilitar o desenvolvimento local) e um aviso é logado.
 
+## Hardening HTTP
+
+- **Helmet** aplica cabeçalhos de segurança em todas as respostas.
+- **Rate limiting** (`@nestjs/throttler`): 120 req/min por IP no geral e
+  **8 tentativas/min** no `POST /auth/login` (anti brute-force). O storage é em
+  memória — para múltiplas instâncias, migrar para um storage compartilhado (Redis).
+- **CORS** por ambiente: defina `CORS_ORIGINS` (lista separada por vírgula) com
+  o domínio do frontend de produção.
+
 ## Project setup
 
 ```bash
