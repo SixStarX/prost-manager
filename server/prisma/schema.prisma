@@ -12,7 +12,9 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      String   @default("ADMIN")
+  // Menor privilégio por padrão. O papel real é sempre definido pela aplicação
+  // (AuthService / seed); este default é apenas defesa em profundidade.
+  role      String   @default("USER")
   createdAt DateTime @default(now())
 }
 

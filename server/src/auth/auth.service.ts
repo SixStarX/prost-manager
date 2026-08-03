@@ -34,11 +34,14 @@ export class AuthService {
         name: data.name,
         email: data.email,
         password: hashedPassword,
+        // Papel sempre explícito: sem isso, cairia no default do schema.
+        // Omitido pelo admin → usuário comum (menor privilégio).
+        role: data.role ?? 'USER',
       },
     });
 
     // Nunca devolver o hash da senha na resposta.
-    return { id: user.id, name: user.name, email: user.email };
+    return { id: user.id, name: user.name, email: user.email, role: user.role };
   }
 
   async login(data: LoginDto) {
@@ -56,9 +59,11 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    // `role` vai no payload para o RolesGuard autorizar sem tocar o banco.
     const token = this.jwtService.sign({
       sub: user.id,
       email: user.email,
+      role: user.role,
     });
 
     return { token };
