@@ -15,7 +15,7 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B1 — Fechar registro público | ✅ **Concluído** | `dd9c40c` |
 | B2 — Autorização por papel (RolesGuard) | ✅ **Concluído** | `dd9c40c` |
 | B3 — Proteger `/oi/scrape` + webhook | ✅ **Concluído** | `55692a4` |
-| B5 — Hardening HTTP (audit/helmet/throttler/CORS) | 🔄 Em andamento | — |
+| B5 — Hardening HTTP (audit/helmet/throttler/CORS) | ✅ **Concluído** | `e464382` |
 | B4 — Migrations · B6 — Infra · B7 — Higiene do repo | ⏳ Pendente | — |
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
@@ -97,8 +97,9 @@ Cada item de reparo segue o mesmo formato:
   3. Passar a versionar toda mudança via `prisma migrate dev` (dev) / `prisma migrate deploy` (prod). Documentar no README.
 - **Esforço:** **M** (1–2d) — depende do provisionamento do shadow DB.
 
-## B5 — Endurecimento HTTP: vulnerabilidades, helmet, rate limit, CORS
+## B5 — Endurecimento HTTP: vulnerabilidades, helmet, rate limit, CORS  ✅ CONCLUÍDO (`e464382`)
 - **Severidade:** 🟠 Alto
+- **Nota (o que ficou pendente):** server com **0 vulnerabilidades**; no web restam **2 high em `react-router-dom`** que exigem upgrade *breaking* (`npm audit fix --force`) — adiado para um upgrade testado (Fase 2). Rate-limit usa storage em memória; para múltiplas instâncias, migrar para Redis.
 - **Causa:** `npm audit` acusa vulns *high* (multer via `@nestjs/platform-express`; vite/launch-editor). Sem `helmet`, sem `@nestjs/throttler`, e o CORS só libera `http://localhost:5173`.
 - **Impacto:** DoS/abuso; brute-force no login; custo descontrolado nos endpoints de IA; **o frontend de produção será bloqueado pelo CORS**.
 - **Arquivos:** `server/src/main.ts`, `server/src/app.module.ts`, `server/package.json`, `prost-web/package.json`
