@@ -164,14 +164,15 @@ Cada item de reparo segue o mesmo formato:
 - **Causa/Impacto:** Token em `localStorage` (roubável por XSS), 1 dia de validade, sem refresh nem revogação.
 - **Ação:** Migrar para **cookie httpOnly + SameSite**, com refresh token curto/rotativo. Arquivos: `auth.*`, `prost-web/src/api/index.ts`, `AuthContext.tsx`.
 
-## H4 — Filtro global de exceções e mensagens de erro
+## H4 — Filtro global de exceções e mensagens de erro  ✅ CONCLUÍDO
 - **Prioridade:** 🟢 Baixo · **Esforço:** S
-- **Ação:** `ExceptionFilter` global padronizando respostas de erro e evitando vazamento de detalhes internos em produção.
+- **Feito:** `AllExceptionsFilter` global (`src/common/all-exceptions.filter.ts`) — corpo padronizado `{ statusCode, message, timestamp, path }`, preserva o `message` (compatível com o `getErrorMessage` do front), 500 nunca vaza detalhe interno em produção, e só 5xx vão para log detalhado + Sentry (sem ruído de 4xx). Substitui o `SentryGlobalFilter`. Verificado em runtime: 400 (array de validação), 401 e 404 com a forma nova.
 
-## H5 — Robustez dos webhooks (retry / dead-letter)
+## H5 — Robustez dos webhooks (retry / dead-letter)  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** M
-- **Causa/Impacto:** Processamento *fire-and-forget* (`void this.processEvent(...).catch(log)`) — eventos falhos só são logados, sem reprocessamento.
-- **Ação:** Persistir status `FAILED` já existe; adicionar reprocesso manual/agendado ou fila (BullMQ) para retry com backoff.
+- **Causa/Impacto:** Processamento *fire-and-forget* — eventos falhos só eram logados, sem reprocessamento.
+- **Feito (sem Redis):** campos `attempts`/`nextRetryAt` (migration `20260803200000_webhook_retry`, aplicada em prod); `recordFailure` com **backoff exponencial** (2,4,8… min, teto 60) e **dead-letter** (`DEAD`) após 5 tentativas; cron `@Cron(EVERY_MINUTE)` que reprocessa os `FAILED` vencidos (handlers idempotentes → sem duplicação); endpoint **admin** `POST /webhooks/events/:id/retry` para retry manual; `getStats` inclui `dead`. Verificado: boot com ScheduleModule OK, endpoint 401/403/200.
+- **Nota multi-instância:** o cron roda em cada instância; para múltiplas, usar lock/fila compartilhada (mesma ressalva do rate limit).
 
 ---
 

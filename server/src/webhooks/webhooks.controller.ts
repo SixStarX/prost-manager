@@ -9,10 +9,13 @@ import {
   UnauthorizedException,
   HttpCode,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import type { OiWebhookPayload } from './webhook.types';
 
 @Controller('webhooks')
@@ -62,5 +65,14 @@ export class WebhooksController {
   @Get('stats')
   getStats() {
     return this.svc.getStats();
+  }
+
+  /** POST /webhooks/events/:id/retry — reprocessa um evento (admin). */
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @Post('events/:id/retry')
+  @HttpCode(200)
+  retry(@Param('id') id: string) {
+    return this.svc.retryEvent(id);
   }
 }

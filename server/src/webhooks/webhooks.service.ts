@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { OiWebhookPayload } from './webhook.types';
@@ -7,6 +8,7 @@ import { errorMessage } from '../common/errors';
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
+  private readonly MAX_ATTEMPTS = 5;
 
   constructor(private prisma: PrismaService) {}
 
@@ -78,49 +80,137 @@ export class WebhooksService {
     payload: OiWebhookPayload,
   ) {
     try {
-      switch (event) {
-        case 'client.created':
-        case 'customer.created':
-          await this.handleClientCreated(payload);
-          break;
-
-        case 'client.updated':
-        case 'customer.updated':
-          await this.handleClientUpdated(payload);
-          break;
-
-        case 'vehicle.created':
-          await this.handleVehicleCreated(payload);
-          break;
-
-        case 'service_order.created':
-        case 'os.created':
-          // Para OS, precisaríamos de diagnóstico prévio — só logamos por enquanto
-          this.logger.log(
-            `OS recebida via webhook: ${JSON.stringify(payload)}`,
-          );
-          break;
-
-        default:
-          // Evento desconhecido — marca como IGNORED mas mantém o registro
-          await this.prisma.webhookEvent.update({
-            where: { id },
-            data: { status: 'IGNORED', processedAt: new Date() },
-          });
-          return;
-      }
-
+      const handled = await this.runHandlers(event, payload);
       await this.prisma.webhookEvent.update({
         where: { id },
-        data: { status: 'PROCESSED', processedAt: new Date() },
+        data: {
+          status: handled ? 'PROCESSED' : 'IGNORED',
+          processedAt: new Date(),
+          error: null,
+          nextRetryAt: null,
+        },
       });
     } catch (err) {
-      await this.prisma.webhookEvent.update({
-        where: { id },
-        data: { status: 'FAILED', error: errorMessage(err) },
-      });
-      throw err;
+      await this.recordFailure(id, err);
     }
+  }
+
+  /**
+   * Executa os handlers do evento. Retorna `false` para evento desconhecido
+   * (marcado como IGNORED, sem retry). Lança em erro (dispara o retry).
+   */
+  private async runHandlers(
+    event: string,
+    payload: OiWebhookPayload,
+  ): Promise<boolean> {
+    switch (event) {
+      case 'client.created':
+      case 'customer.created':
+        await this.handleClientCreated(payload);
+        return true;
+
+      case 'client.updated':
+      case 'customer.updated':
+        await this.handleClientUpdated(payload);
+        return true;
+
+      case 'vehicle.created':
+        await this.handleVehicleCreated(payload);
+        return true;
+
+      case 'service_order.created':
+      case 'os.created':
+        // Para OS, precisaríamos de diagnóstico prévio — só logamos por enquanto
+        this.logger.log(`OS recebida via webhook: ${JSON.stringify(payload)}`);
+        return true;
+
+      default:
+        return false; // desconhecido → IGNORED
+    }
+  }
+
+  /**
+   * Registra a falha: incrementa tentativas e agenda o próximo retry com
+   * backoff exponencial (2, 4, 8… min, teto 60). Esgotadas as tentativas,
+   * move para DEAD (dead-letter) para inspeção/retry manual.
+   */
+  private async recordFailure(id: string, err: unknown) {
+    const current = await this.prisma.webhookEvent.findUnique({
+      where: { id },
+      select: { attempts: true },
+    });
+    const attempts = (current?.attempts ?? 0) + 1;
+    const exhausted = attempts >= this.MAX_ATTEMPTS;
+    const backoffMin = Math.min(2 ** attempts, 60);
+
+    await this.prisma.webhookEvent.update({
+      where: { id },
+      data: {
+        status: exhausted ? 'DEAD' : 'FAILED',
+        attempts,
+        error: errorMessage(err),
+        nextRetryAt: exhausted
+          ? null
+          : new Date(Date.now() + backoffMin * 60_000),
+      },
+    });
+
+    this.logger.error(
+      `Webhook ${id} falhou (tentativa ${attempts}/${this.MAX_ATTEMPTS})` +
+        `${exhausted ? ' — movido para DEAD (dead-letter)' : `, próximo retry em ${backoffMin}min`}: ${errorMessage(err)}`,
+    );
+  }
+
+  /**
+   * Reprocessa periodicamente os eventos FAILED cujo backoff já venceu.
+   * Os handlers verificam existência antes de criar, então reprocessar (mesmo
+   * em múltiplas instâncias) não duplica dados.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async retryDueEvents() {
+    const due = await this.prisma.webhookEvent.findMany({
+      where: { status: 'FAILED', nextRetryAt: { lte: new Date() } },
+      select: { id: true, event: true, payload: true },
+      orderBy: { nextRetryAt: 'asc' },
+      take: 20,
+    });
+    if (due.length === 0) return;
+
+    this.logger.log(`Retry de ${due.length} webhook(s) pendente(s).`);
+    for (const ev of due) {
+      let payload: OiWebhookPayload;
+      try {
+        payload = JSON.parse(ev.payload) as OiWebhookPayload;
+      } catch {
+        await this.prisma.webhookEvent.update({
+          where: { id: ev.id },
+          data: { status: 'DEAD', error: 'Payload inválido (JSON).' },
+        });
+        continue;
+      }
+      await this.processEvent(ev.id, ev.event, payload);
+    }
+  }
+
+  /**
+   * Retry manual (endpoint admin): reprocessa um evento FAILED/DEAD agora.
+   */
+  async retryEvent(id: string) {
+    const ev = await this.prisma.webhookEvent.findUnique({ where: { id } });
+    if (!ev) return { ok: false, message: 'Evento não encontrado.' };
+
+    let payload: OiWebhookPayload;
+    try {
+      payload = JSON.parse(ev.payload) as OiWebhookPayload;
+    } catch {
+      return { ok: false, message: 'Payload inválido (JSON).' };
+    }
+    await this.processEvent(id, ev.event, payload);
+    const updated = await this.prisma.webhookEvent.findUnique({
+      where: { id },
+      select: { status: true, attempts: true },
+    });
+    return { ok: true, status: updated?.status, attempts: updated?.attempts };
   }
 
   private async handleClientCreated(payload: OiWebhookPayload) {
@@ -211,6 +301,8 @@ export class WebhooksService {
         event: true,
         status: true,
         error: true,
+        attempts: true,
+        nextRetryAt: true,
         createdAt: true,
         processedAt: true,
         // payload omitido do listing (pode ser grande)
@@ -223,18 +315,20 @@ export class WebhooksService {
   }
 
   async getStats() {
-    const [total, processed, failed, ignored] = await Promise.all([
+    const [total, processed, failed, ignored, dead] = await Promise.all([
       this.prisma.webhookEvent.count(),
       this.prisma.webhookEvent.count({ where: { status: 'PROCESSED' } }),
       this.prisma.webhookEvent.count({ where: { status: 'FAILED' } }),
       this.prisma.webhookEvent.count({ where: { status: 'IGNORED' } }),
+      this.prisma.webhookEvent.count({ where: { status: 'DEAD' } }),
     ]);
     return {
       total,
       processed,
       failed,
       ignored,
-      received: total - processed - failed - ignored,
+      dead,
+      received: total - processed - failed - ignored - dead,
     };
   }
 }

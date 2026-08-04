@@ -238,8 +238,13 @@ model WebhookEvent {
   source      String                          // "oficina_inteligente"
   event       String                          // tipo do evento
   payload     String   @db.Text              // JSON bruto recebido
-  status      String   @default("RECEIVED")  // RECEIVED | PROCESSED | FAILED | IGNORED
+  // RECEIVED | PROCESSED | IGNORED | FAILED (aguardando retry) | DEAD (esgotado)
+  status      String   @default("RECEIVED")
   error       String?  @db.Text
+  attempts    Int      @default(0)            // nº de tentativas de processamento
+  nextRetryAt DateTime?                        // quando FAILED, próximo retry (cron)
   createdAt   DateTime @default(now())
   processedAt DateTime?
+
+  @@index([status, nextRetryAt])              // usado pelo cron de retry
 }
