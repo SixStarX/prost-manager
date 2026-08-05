@@ -188,7 +188,7 @@ Cada item de reparo segue o mesmo formato:
 | P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
 | P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
 | P5 | **Enums Prisma** no lugar de `String` | 🟢 Baixo | S | `status`, `unit`, `role`, `source` → integridade a nível de banco. |
-| P6 | **IA: timeout, cache e limite de custo** | 🟡 Médio | M | 🟡 **Parcial:** timeout de 45s (`GEMINI_TIMEOUT_MS`) nas chamadas Gemini + limites de entrada (queixa ≤ 4000 chars, PDF ≤ ~7,5 MB). Falta: cache de resultados. |
+| P6 | **IA: timeout, cache e limite de custo** | 🟡 Médio | M | ✅ **Concluído:** timeout de 45s (`GEMINI_TIMEOUT_MS`) + limites de entrada (queixa ≤ 4000 chars, PDF ≤ ~7,5 MB) + **cache em memória** dos laudos (TTL 1h, `GEMINI_CACHE_TTL_MS`, cap 100) — mesma queixa/veículo não reprocessa; PDF de scanner nunca entra em cache. |
 | P7 | **Sanitizar dedupe de cliente** | 🟢 Baixo | S | Comparação por nome é frágil (acentos/espaços/caixa); normalizar antes de casar. |
 | P8 | **Revisar tipagem estrita** | 🟢 Baixo | S | `noImplicitAny: false` e `strictBindCallApply: false` afrouxam checagem. |
 
