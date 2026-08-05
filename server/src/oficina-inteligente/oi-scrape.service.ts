@@ -26,7 +26,7 @@ export interface ScrapeResult {
 // ── Helpers de mapeamento de colunas ────────────────────────────────────────
 
 /** Normaliza: minúsculas, sem acentos, só letras e números */
-function normalize(s: string): string {
+export function normalize(s: string): string {
   return (s || '')
     .toLowerCase()
     .normalize('NFD')
@@ -35,7 +35,7 @@ function normalize(s: string): string {
 }
 
 /** Constrói um índice header-normalizado → posição na linha */
-function buildIndex(headers: string[]): Record<string, number> {
+export function buildIndex(headers: string[]): Record<string, number> {
   const idx: Record<string, number> = {};
   headers.forEach((h, i) => {
     idx[normalize(h)] = i;
@@ -44,7 +44,7 @@ function buildIndex(headers: string[]): Record<string, number> {
 }
 
 /** Pega o valor de uma célula tentando múltiplos aliases de coluna */
-function cell(
+export function cell(
   row: string[],
   idx: Record<string, number>,
   ...aliases: string[]
@@ -60,7 +60,7 @@ function cell(
 }
 
 /** "R$ 1.234,56" → 1234.56 */
-function parseMoney(s: string): number {
+export function parseMoney(s: string): number {
   if (!s) return 0;
   const clean = s
     .replace(/[^\d.,-]/g, '')
@@ -70,7 +70,7 @@ function parseMoney(s: string): number {
   return isNaN(n) ? 0 : n;
 }
 
-function parseYear(s: string): number {
+export function parseYear(s: string): number {
   // aceita "2012", "2012/2013", "2012 - GASOLINA"
   const m = (s || '').match(/(19|20)\d{2}/);
   return m ? parseInt(m[0], 10) : new Date().getFullYear();
@@ -81,7 +81,7 @@ function parseYear(s: string): number {
  * Status conhecidos da OI: Enviado, Aprovado Total, Aprovado Parcial,
  * Em aberto, Reprovado, Gerado Revisão, Gerado O.S., Aberta, Fechada.
  */
-function mapStatus(situacao: string): 'OPEN' | 'IN_PROGRESS' | 'DONE' {
+export function mapStatus(situacao: string): 'OPEN' | 'IN_PROGRESS' | 'DONE' {
   const s = (situacao || '').toLowerCase();
   if (/aprovado\s*total|conclu|finaliz|fechad|pago|gerado\s*o\.?s/.test(s))
     return 'DONE';

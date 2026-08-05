@@ -183,7 +183,7 @@ Cada item de reparo segue o mesmo formato:
 
 | ID | Item | Prioridade | Esforço | Nota |
 |---|---|---|---|---|
-| P1 | **Testes automatizados + CI** | 🟡 Médio | L | 🟡 **Iniciado:** 18 testes (auth: login/refresh/rotação/revogação · RolesGuard · AllExceptionsFilter), rodando no CI (passo `jest`). Falta: webhooks/scrape e testes de frontend. |
+| P1 | **Testes automatizados + CI** | 🟡 Médio | L | ✅ **Concluído:** 33 testes no backend (auth login/refresh/rotação/revogação · RolesGuard · filtro de exceções · scrape helpers · token do coletor · webhook HMAC/stats/retry+dead-letter) + 5 no frontend (`getErrorMessage`, vitest). `jest` e `vitest` rodando no CI. |
 | P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | `aria-label` em botões-ícone, contraste, navegação por teclado. |
 | P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
 | P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
