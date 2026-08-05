@@ -28,6 +28,8 @@ jobs:
       - run: npx prisma generate
       - name: Lint
         run: npx eslint src
+      - name: Test
+        run: npx jest --ci
       - name: Build
         run: npm run build
 

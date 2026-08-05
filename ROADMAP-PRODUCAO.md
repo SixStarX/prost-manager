@@ -48,11 +48,11 @@ Cada item de reparo segue o mesmo formato:
 
 ## Visão geral das fases
 
-| Fase | Objetivo | Quando | Esforço somado |
+| Fase | Objetivo | Status | Esforço somado |
 |---|---|---|---|
-| **Fase 0 — Bloqueadores** | Tornar o deploy seguro e operável | **Obrigatório antes do go-live** | ~9–14 dias |
-| **Fase 1 — Endurecimento** | Reduzir risco e melhorar robustez | Logo antes ou na 1ª semana | ~4–6 dias |
-| **Fase 2 — Pós-deploy** | Qualidade, escala e manutenção | Sem pressa, sem parar o ar | ~8–12 dias |
+| ~~**Fase 0 — Bloqueadores**~~ | ~~Tornar o deploy seguro e operável~~ | ✅ **CONCLUÍDA** | ~~~9–14 dias~~ |
+| ~~**Fase 1 — Endurecimento**~~ | ~~Reduzir risco e melhorar robustez~~ | ✅ **CONCLUÍDA** | ~~~4–6 dias~~ |
+| **Fase 2 — Pós-deploy** | Qualidade, escala e manutenção | 🟡 Iniciada (P6 parcial) | ~8–12 dias |
 
 ---
 
@@ -183,7 +183,7 @@ Cada item de reparo segue o mesmo formato:
 
 | ID | Item | Prioridade | Esforço | Nota |
 |---|---|---|---|---|
-| P1 | **Testes automatizados + CI** | 🟡 Médio | L | Cobertura hoje ~0 em `server/src` e no frontend. Começar por auth, scrape e webhooks. |
+| P1 | **Testes automatizados + CI** | 🟡 Médio | L | 🟡 **Iniciado:** 18 testes (auth: login/refresh/rotação/revogação · RolesGuard · AllExceptionsFilter), rodando no CI (passo `jest`). Falta: webhooks/scrape e testes de frontend. |
 | P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | `aria-label` em botões-ícone, contraste, navegação por teclado. |
 | P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
 | P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
@@ -197,36 +197,39 @@ Cada item de reparo segue o mesmo formato:
 ## 🧭 Ordem de execução recomendada
 
 ```
-1. B7  Higienizar repo e commitar        (destrava tudo; ≤0,5d)
-2. B5  audit fix + helmet + throttler + CORS
-3. B1  Fechar registro público
-4. B2  Autorização por papel (RolesGuard)
-5. B3  Proteger /oi/scrape + webhook fail-closed
-6. B4  Migrations (provisionar shadow DB + baseline)
-7. B6  Infra: Docker + /health + logs + monitoramento + backup
-   ── PORTÃO DE GO-LIVE (confiança ≥ 85%) ──
-8. Fase 1 (H1–H5) em paralelo à estabilização
-9. Fase 2 (P1–P8) de forma contínua
+[✓] 1. B7  Higienizar repo e commitar
+[✓] 2. B5  audit fix + helmet + throttler + CORS
+[✓] 3. B1  Fechar registro público
+[✓] 4. B2  Autorização por papel (RolesGuard)
+[✓] 5. B3  Proteger /oi/scrape + webhook fail-closed
+[✓] 6. B4  Migrations (baseline aplicado em prod)
+[✓] 7. B6  Infra: Docker + /health + CI + Sentry + backup
+    ══ ✅ PORTÃO DE GO-LIVE ATINGIDO (confiança ≥ 85%) ══
+[✓] 8. Fase 1 (H1–H5) concluída
+[ ] 9. Fase 2 (P1–P8) — em andamento (P6 parcial)
 ```
 
-**Estimativa até o go-live (Fase 0):** **~9 a 14 dias-pessoa**, dependendo de:
-- provisionamento do shadow DB (B4) e do ambiente de infra (B6);
-- escopo do controle de acesso (B2) — só papéis (mais rápido) vs. convites por e-mail.
+**~~Estimativa até o go-live (Fase 0): ~9 a 14 dias-pessoa~~ → ✅ ENTREGUE.**
+As Fases 0 e 1 foram concluídas e validadas (16 commits).
 
 ---
 
 ## ✅ Checklist do dia do deploy (go-live)
 
-- [ ] Todos os itens **B1–B7** concluídos e validados.
-- [ ] `npm run build` limpo em `server/` e `prost-web/` a partir de checkout limpo.
-- [ ] `.env` de produção preenchido: `DATABASE_URL`, `JWT_SECRET` (forte), `OI_TOKEN`, `OI_WEBHOOK_SECRET`, `COLLECTOR_TOKEN`, `GEMINI_API_KEY`, `CORS_ORIGINS`, `PORT`.
-- [ ] `prisma migrate deploy` executado (sem `db push`).
-- [ ] Primeiro admin provisionado via seed; registro público desabilitado.
+Feitos no código/infra (✅):
+- [x] ~~Todos os itens **B1–B7** concluídos e validados.~~
+- [x] ~~`npm run build` limpo em `server/` e `prost-web/`.~~
+- [x] ~~`prisma migrate deploy` executado (sem `db push`).~~ (4 migrations aplicadas)
+- [x] ~~Registro público desabilitado; seed do 1º admin pronto.~~
+- [x] ~~`GET /health` respondendo 200 sem autenticação.~~
+- [x] ~~`npm audit` sem *high* no server.~~ (web: 2 *high* em `react-router-dom`, upgrade adiado)
+
+Operacionais no ambiente de vocês (pendentes):
+- [ ] `.env` de produção preenchido: `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET` (forte), `OI_TOKEN`, `OI_WEBHOOK_SECRET`, `COLLECTOR_TOKEN`, `CORS_ORIGINS`, `COOKIE_DOMAIN` (se aplicável), `GEMINI_API_KEY`, `SENTRY_DSN` (opcional).
+- [ ] Provisionar o 1º admin via `npm run seed`.
 - [ ] HTTPS ativo (TLS no proxy/host) e CORS com domínio de produção.
-- [ ] `GET /health` respondendo 200 sem autenticação.
-- [ ] Error tracking recebendo eventos (teste proposital de erro).
+- [ ] Error tracking recebendo eventos (setar `SENTRY_DSN` e testar).
 - [ ] Backup automático do MySQL ativo e **restauração testada** ao menos uma vez.
-- [ ] `npm audit` sem vulnerabilidades *high* remanescentes.
 
 ---
 
