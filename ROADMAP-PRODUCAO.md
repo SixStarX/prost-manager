@@ -20,9 +20,10 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
 | B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
 
-**🎉 Fase 0 (7/7 bloqueadores) e Fase 1 (H1–H5) completas.** Restam apenas
-itens opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
-ambiente de vocês) e a Fase 2 (pós-deploy).
+**🎉 Fase 0 (7/7 bloqueadores) e Fase 1 (H1–H5) completas.** Fase 2 iniciada
+(P6 parcial). Guia de deploy/staging em [DEPLOY.md](DEPLOY.md). Restam itens
+opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
+ambiente de vocês) e o restante da Fase 2 (pós-deploy).
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -187,7 +188,7 @@ Cada item de reparo segue o mesmo formato:
 | P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
 | P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
 | P5 | **Enums Prisma** no lugar de `String` | 🟢 Baixo | S | `status`, `unit`, `role`, `source` → integridade a nível de banco. |
-| P6 | **IA: timeout, cache e limite de custo** | 🟡 Médio | M | Chamadas Gemini síncronas com `googleSearch`; sanitizar entrada (queixa/VIN) e limitar abuso. |
+| P6 | **IA: timeout, cache e limite de custo** | 🟡 Médio | M | 🟡 **Parcial:** timeout de 45s (`GEMINI_TIMEOUT_MS`) nas chamadas Gemini + limites de entrada (queixa ≤ 4000 chars, PDF ≤ ~7,5 MB). Falta: cache de resultados. |
 | P7 | **Sanitizar dedupe de cliente** | 🟢 Baixo | S | Comparação por nome é frágil (acentos/espaços/caixa); normalizar antes de casar. |
 | P8 | **Revisar tipagem estrita** | 🟢 Baixo | S | `noImplicitAny: false` e `strictBindCallApply: false` afrouxam checagem. |
 

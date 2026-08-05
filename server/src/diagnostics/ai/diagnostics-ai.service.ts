@@ -14,6 +14,10 @@ import { SYSTEM_PROMPT } from './system-prompt';
 import { errorMessage } from '../../common/errors';
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+// Limites de robustez/custo da chamada à IA (P6).
+const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 45_000;
+const MAX_COMPLAINT_LEN = 4000; // caracteres da queixa
+const MAX_PDF_B64_LEN = 10 * 1024 * 1024; // ~7,5 MB de PDF em base64
 
 /** Subconjunto (consumido pelo backend) do laudo estruturado devolvido pela IA. */
 export interface DiagnosticoResultado {
@@ -70,6 +74,27 @@ export class DiagnosticsAiService {
     return new GoogleGenAI({ apiKey });
   }
 
+  /** Corta a chamada à IA se passar de TIMEOUT_MS — evita requisição pendurada. */
+  private async withTimeout<T>(op: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new ServiceUnavailableException(
+              'A IA demorou demais para responder. Tente novamente.',
+            ),
+          ),
+        TIMEOUT_MS,
+      );
+    });
+    try {
+      return await Promise.race([op, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Sanitiza e parseia JSON que pode vir com cercas markdown ou texto extra. */
   private parseJson<T>(text: string): T {
     const t = (text || '').replace(/```json\n?|```/g, '').trim();
@@ -114,14 +139,16 @@ export class DiagnosticsAiService {
       4. Não inclua markdown ou explicações, apenas o objeto JSON.`;
 
     const ai = await this.client();
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: 'application/json',
-      },
-    });
+    const response = await this.withTimeout(
+      ai.models.generateContent({
+        model: MODEL,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: 'application/json',
+        },
+      }),
+    );
 
     const data = this.parseJson<VeiculoInput>(response.text || '{}');
     return { ...data, chassis: vin };
@@ -133,6 +160,16 @@ export class DiagnosticsAiService {
     const { veiculo, queixa, obd, scannerPdfBase64 } = input;
     if (!veiculo?.marca || !veiculo?.modelo || !queixa?.trim()) {
       throw new BadRequestException('Marca, modelo e queixa são obrigatórios.');
+    }
+    if (queixa.length > MAX_COMPLAINT_LEN) {
+      throw new BadRequestException(
+        `A queixa é muito longa (máx. ${MAX_COMPLAINT_LEN} caracteres).`,
+      );
+    }
+    if (scannerPdfBase64 && scannerPdfBase64.length > MAX_PDF_B64_LEN) {
+      throw new BadRequestException(
+        'O PDF do scanner é muito grande (máx. ~7,5 MB).',
+      );
     }
 
     const prompt = `Veículo: ${veiculo.marca} ${veiculo.modelo} ${veiculo.sub_modelo ? `${veiculo.sub_modelo} ` : ''}${veiculo.versao || ''} | Chassis: ${veiculo.chassis || ''} | Fabricação: ${veiculo.ano_fabricacao || ''} | Modelo: ${veiculo.ano_modelo || ''} | Motor: ${veiculo.motor || ''} | Combustível: ${veiculo.combustivel || ''} | Câmbio: ${veiculo.cambio || ''} | KM: ${veiculo.quilometragem || ''}${veiculo.historico_manutencao ? ` | Histórico: ${veiculo.historico_manutencao}` : ''}${veiculo.modificacoes ? ` | Modificações: ${veiculo.modificacoes}` : ''}
@@ -158,15 +195,17 @@ Execute diagnóstico completo com pesquisa web e retorne o JSON conforme as regr
     const ai = await this.client();
     let response: GenerateContentResponse;
     try {
-      response = await ai.models.generateContent({
-        model: MODEL,
-        contents,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-        },
-      });
+      response = await this.withTimeout(
+        ai.models.generateContent({
+          model: MODEL,
+          contents,
+          config: {
+            systemInstruction: SYSTEM_PROMPT,
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
+          },
+        }),
+      );
     } catch (err) {
       this.logger.error(`Falha na chamada Gemini: ${errorMessage(err)}`);
       throw new ServiceUnavailableException(
