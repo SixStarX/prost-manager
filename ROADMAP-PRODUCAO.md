@@ -20,9 +20,9 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
 | B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
 
-**🎉 Fase 0 completa — todos os 7 bloqueadores resolvidos.** Restam apenas
+**🎉 Fase 0 (7/7 bloqueadores) e Fase 1 (H1–H5) completas.** Restam apenas
 itens opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
-ambiente de vocês) e as Fases 1–2.
+ambiente de vocês) e a Fase 2 (pós-deploy).
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -159,10 +159,12 @@ Cada item de reparo segue o mesmo formato:
 - **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
 - **Feito:** `@@index` em `Client.name`, `Client.cpfcnpj` e `Vehicle.plate` (colunas não-FK; as FK já têm índice automático no MySQL). Migration `20260803190000_add_query_indexes` **aplicada em produção** via `migrate deploy` — 3/3 índices confirmados no banco. (Unicidade em placa/cpfcnpj foi adiada: exige checagem/limpeza de duplicados antes, senão o índice único falha.)
 
-## H3 — Sessão mais robusta (JWT)
+## H3 — Sessão mais robusta (JWT)  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** M
 - **Causa/Impacto:** Token em `localStorage` (roubável por XSS), 1 dia de validade, sem refresh nem revogação.
-- **Ação:** Migrar para **cookie httpOnly + SameSite**, com refresh token curto/rotativo. Arquivos: `auth.*`, `prost-web/src/api/index.ts`, `AuthContext.tsx`.
+- **Feito:** access token JWT de **15 min** em **cookie httpOnly + SameSite=Lax + Secure(prod)**; **refresh token opaco rotativo de 7 dias**, guardado só como hash SHA-256 na tabela `RefreshToken` (migration aplicada em prod), com **revogação** e rotação (reuso detectado). Endpoints `/auth/refresh`, `/auth/logout`, `/auth/me`; `JwtStrategy` lê o cookie (fallback Bearer); `cookie-parser` + CORS `credentials`. Frontend: `withCredentials`, interceptor que **renova em 401 e repete a requisição**, `AuthContext` via `/auth/me`, `ProtectedRoute` com loading. Cron diário limpa tokens expirados/revogados.
+- **Verificado:** fluxo via curl (login→me→refresh→logout com rotação+revogação no banco) e **E2E no browser** (login → home autenticada → `/api/dashboard` 200 via cookie, sem erros).
+- **Deploy:** front e API no mesmo host (nginx + proxy `/api`) funcionam sem config extra; se forem subdomínios distintos, definir `COOKIE_DOMAIN`. CSRF coberto por SameSite=Lax.
 
 ## H4 — Filtro global de exceções e mensagens de erro  ✅ CONCLUÍDO
 - **Prioridade:** 🟢 Baixo · **Esforço:** S

@@ -16,7 +16,8 @@ import { jwtSecret } from './jwt.secret';
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: jwtSecret(),
-        signOptions: { expiresIn: '1d' },
+        // Access token curto; a sessão se mantém via refresh token rotativo.
+        signOptions: { expiresIn: '15m' },
       }),
     }),
   ],

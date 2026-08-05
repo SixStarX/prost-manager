@@ -16,6 +16,22 @@ model User {
   // (AuthService / seed); este default é apenas defesa em profundidade.
   role      String   @default("USER")
   createdAt DateTime @default(now())
+
+  refreshTokens RefreshToken[]
+}
+
+// Refresh tokens de sessão (rotativos). Guardamos só o hash SHA-256 do token;
+// o valor bruto vive apenas no cookie httpOnly do cliente.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Client {
