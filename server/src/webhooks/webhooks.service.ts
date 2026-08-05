@@ -214,7 +214,7 @@ export class WebhooksService {
   }
 
   private async handleClientCreated(payload: OiWebhookPayload) {
-    const name = payload.nome || payload.name || payload.razao_social;
+    const name = (payload.nome || payload.name || payload.razao_social)?.trim();
     const phone = payload.telefone || payload.phone || payload.celular || '—';
     const email = payload.email || null;
 
@@ -230,7 +230,7 @@ export class WebhooksService {
   }
 
   private async handleClientUpdated(payload: OiWebhookPayload) {
-    const name = payload.nome || payload.name;
+    const name = (payload.nome || payload.name)?.trim();
     const phone = payload.telefone || payload.phone || payload.celular;
     const email = payload.email;
 
@@ -252,13 +252,17 @@ export class WebhooksService {
   }
 
   private async handleVehicleCreated(payload: OiWebhookPayload) {
-    const plate = payload.placa || payload.plate;
+    const plate = (payload.placa || payload.plate)?.trim();
     const brand = payload.marca || payload.brand || '—';
     const model = payload.modelo || payload.model || '—';
     const year =
       parseInt(String(payload.ano ?? payload.year ?? ''), 10) ||
       new Date().getFullYear();
-    const cliName = payload.cliente || payload.proprietario || payload.owner;
+    const cliName = (
+      payload.cliente ||
+      payload.proprietario ||
+      payload.owner
+    )?.trim();
 
     if (!plate || !cliName) return;
 
