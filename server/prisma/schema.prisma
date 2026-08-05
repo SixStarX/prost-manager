@@ -12,8 +12,26 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      String   @default("ADMIN")
+  // Menor privilégio por padrão. O papel real é sempre definido pela aplicação
+  // (AuthService / seed); este default é apenas defesa em profundidade.
+  role      String   @default("USER")
   createdAt DateTime @default(now())
+
+  refreshTokens RefreshToken[]
+}
+
+// Refresh tokens de sessão (rotativos). Guardamos só o hash SHA-256 do token;
+// o valor bruto vive apenas no cookie httpOnly do cliente.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Client {
@@ -50,6 +68,11 @@ model Client {
 
   vehicles   Vehicle[]
   checklists Checklist[]
+
+  // Consultados por findFirst na sincronização (scrape/webhook) — não são FK,
+  // então precisam de índice explícito para evitar full scan.
+  @@index([name])
+  @@index([cpfcnpj])
 }
 
 model Vehicle {
@@ -72,6 +95,9 @@ model Vehicle {
 
   diagnostics Diagnostic[]
   checklists  Checklist[]
+
+  // Consultado por findFirst na sincronização (upsert por placa) — precisa de índice.
+  @@index([plate])
 }
 
 // ── Checklist / Vistoria de veículo ──────────────────────────
@@ -228,8 +254,13 @@ model WebhookEvent {
   source      String                          // "oficina_inteligente"
   event       String                          // tipo do evento
   payload     String   @db.Text              // JSON bruto recebido
-  status      String   @default("RECEIVED")  // RECEIVED | PROCESSED | FAILED | IGNORED
+  // RECEIVED | PROCESSED | IGNORED | FAILED (aguardando retry) | DEAD (esgotado)
+  status      String   @default("RECEIVED")
   error       String?  @db.Text
+  attempts    Int      @default(0)            // nº de tentativas de processamento
+  nextRetryAt DateTime?                        // quando FAILED, próximo retry (cron)
   createdAt   DateTime @default(now())
   processedAt DateTime?
+
+  @@index([status, nextRetryAt])              // usado pelo cron de retry
 }

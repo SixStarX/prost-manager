@@ -86,6 +86,7 @@ export function HeaderIconButton({
     <button
       onClick={onClick}
       title={title}
+      aria-label={title}
       disabled={disabled}
       className="rounded-lg p-2 transition-colors hover:bg-secondary disabled:opacity-50"
     >

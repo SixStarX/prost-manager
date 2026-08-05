@@ -9,10 +9,13 @@ import {
   UnauthorizedException,
   HttpCode,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import type { OiWebhookPayload } from './webhook.types';
 
 @Controller('webhooks')
@@ -37,13 +40,10 @@ export class WebhooksController {
     @Headers('x-oi-signature') signature?: string,
     @Headers('x-oi-event') eventHeader?: string,
   ) {
-    // Verificação de assinatura
-    const rawBody = req.rawBody;
-    if (rawBody) {
-      const valid = this.svc.verifySignature(rawBody, signature);
-      if (!valid)
-        throw new UnauthorizedException('Assinatura do webhook inválida.');
-    }
+    // Verificação de assinatura — sempre executada (fail-closed em produção).
+    const valid = this.svc.verifySignature(req.rawBody, signature);
+    if (!valid)
+      throw new UnauthorizedException('Assinatura do webhook inválida.');
 
     const event =
       eventHeader || body.event || body.tipo || body.type || 'unknown';
@@ -65,5 +65,14 @@ export class WebhooksController {
   @Get('stats')
   getStats() {
     return this.svc.getStats();
+  }
+
+  /** POST /webhooks/events/:id/retry — reprocessa um evento (admin). */
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @Post('events/:id/retry')
+  @HttpCode(200)
+  retry(@Param('id') id: string) {
+    return this.svc.retryEvent(id);
   }
 }

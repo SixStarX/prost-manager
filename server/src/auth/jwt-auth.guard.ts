@@ -5,7 +5,8 @@ import { IS_PUBLIC_KEY } from './public.decorator';
 
 /**
  * Guard global: exige JWT válido em toda requisição, exceto nas rotas marcadas
- * com `@Public()` (login/registro e ingestão externa via webhook/bookmarklet).
+ * com `@Public()` (login e ingestão externa via webhook/bookmarklet). A criação
+ * de usuários (`/auth/register`) deixou de ser pública: exige ADMIN.
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {

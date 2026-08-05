@@ -1,28 +1,68 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import api from '../api';
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  role: string;
+  name?: string;
+}
 
 interface AuthContextType {
-  token: string | null;
-  login: (token: string) => void;
-  logout: () => void;
+  user: SessionUser | null;
+  loading: boolean;
+  login: (user: SessionUser) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((t: string) => {
-    localStorage.setItem('token', t);
-    setToken(t);
+  // Ao montar, descobre se há sessão válida (cookie httpOnly) via /auth/me.
+  // Se o access expirou mas o refresh é válido, o interceptor renova sozinho.
+  useEffect(() => {
+    let active = true;
+    api
+      .get<{ user: SessionUser }>('/auth/me')
+      .then((r) => {
+        if (active) setUser(r.data.user);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setToken(null);
+  const login = useCallback((u: SessionUser) => setUser(u), []);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      /* mesmo se falhar, limpamos o estado local */
+    }
+    setUser(null);
   }, []);
 
-  // Memoiza o value para evitar re-renderizações desnecessárias dos consumidores.
-  const value = useMemo<AuthContextType>(() => ({ token, login, logout }), [token, login, logout]);
+  const value = useMemo<AuthContextType>(
+    () => ({ user, loading, login, logout }),
+    [user, loading, login, logout],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

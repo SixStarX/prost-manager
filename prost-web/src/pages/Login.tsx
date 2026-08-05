@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
@@ -20,7 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,7 +29,7 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      login(data.token);
+      login(data.user);
       navigate('/');
     } catch {
       setError('Email ou senha inválidos. Tente novamente.');
@@ -37,6 +37,9 @@ export default function Login() {
       setLoading(false);
     }
   }
+
+  // Já autenticado? Vai direto para o app.
+  if (user) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen flex bg-base overflow-hidden">
