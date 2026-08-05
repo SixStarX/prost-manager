@@ -190,6 +190,7 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
             }}
             onKeyDown={onKeyDown}
             autoFocus
+            aria-label="Buscar por placa, carro ou cliente"
             placeholder="Buscar por placa, carro ou cliente…"
             className="flex-1 h-14 bg-transparent outline-none text-[15px] text-t1 placeholder:text-t3"
           />

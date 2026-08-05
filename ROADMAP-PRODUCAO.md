@@ -184,7 +184,7 @@ Cada item de reparo segue o mesmo formato:
 | ID | Item | Prioridade | Esforço | Nota |
 |---|---|---|---|---|
 | P1 | **Testes automatizados + CI** | 🟡 Médio | L | ✅ **Concluído:** 33 testes no backend (auth login/refresh/rotação/revogação · RolesGuard · filtro de exceções · scrape helpers · token do coletor · webhook HMAC/stats/retry+dead-letter) + 5 no frontend (`getErrorMessage`, vitest). `jest` e `vitest` rodando no CI. |
-| P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | `aria-label` em botões-ícone, contraste, navegação por teclado. |
+| P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | 🟡 **Iniciada:** `aria-label` no `HeaderIconButton` e nos inputs de busca (global e timeline). Falta: varredura completa (contraste, foco/teclado, demais ícones). |
 | P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
 | P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
 | P5 | **Enums Prisma** no lugar de `String` | 🟢 Baixo | S | `status`, `unit`, `role`, `source` → integridade a nível de banco. |
