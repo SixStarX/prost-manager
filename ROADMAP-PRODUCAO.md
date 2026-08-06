@@ -20,9 +20,10 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
 | B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
 
-**🎉 Fase 0 completa — todos os 7 bloqueadores resolvidos.** Restam apenas
-itens opcionais (logs JSON via pino; rodar o 1º backup/teste de restauração no
-ambiente de vocês) e as Fases 1–2.
+**🎉 Fases 0, 1 e 2 concluídas.** Fase 0 (7/7) + Fase 1 (H1–H5) + Fase 2 (P1–P8).
+Restam apenas pontas opcionais (varredura completa de a11y; migrar dataURLs
+legados de assinatura; enums de `status` expostos em DTO). Guia de deploy/staging
+em [DEPLOY.md](DEPLOY.md).
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -47,11 +48,11 @@ Cada item de reparo segue o mesmo formato:
 
 ## Visão geral das fases
 
-| Fase | Objetivo | Quando | Esforço somado |
+| Fase | Objetivo | Status | Esforço somado |
 |---|---|---|---|
-| **Fase 0 — Bloqueadores** | Tornar o deploy seguro e operável | **Obrigatório antes do go-live** | ~9–14 dias |
-| **Fase 1 — Endurecimento** | Reduzir risco e melhorar robustez | Logo antes ou na 1ª semana | ~4–6 dias |
-| **Fase 2 — Pós-deploy** | Qualidade, escala e manutenção | Sem pressa, sem parar o ar | ~8–12 dias |
+| ~~**Fase 0 — Bloqueadores**~~ | ~~Tornar o deploy seguro e operável~~ | ✅ **CONCLUÍDA** | ~~~9–14 dias~~ |
+| ~~**Fase 1 — Endurecimento**~~ | ~~Reduzir risco e melhorar robustez~~ | ✅ **CONCLUÍDA** | ~~~4–6 dias~~ |
+| ~~**Fase 2 — Pós-deploy**~~ | ~~Qualidade, escala e manutenção~~ | ✅ **Itens seguros feitos** (P4/P5/P8 adiados) | ~8–12 dias |
 
 ---
 
@@ -159,19 +160,22 @@ Cada item de reparo segue o mesmo formato:
 - **Causa/Impacto:** `findFirst` por `Vehicle.plate`, `Client.name`, `Client.cpfcnpj` sem índice → *full scan* que degrada com volume (fluxos de scrape/webhook).
 - **Feito:** `@@index` em `Client.name`, `Client.cpfcnpj` e `Vehicle.plate` (colunas não-FK; as FK já têm índice automático no MySQL). Migration `20260803190000_add_query_indexes` **aplicada em produção** via `migrate deploy` — 3/3 índices confirmados no banco. (Unicidade em placa/cpfcnpj foi adiada: exige checagem/limpeza de duplicados antes, senão o índice único falha.)
 
-## H3 — Sessão mais robusta (JWT)
+## H3 — Sessão mais robusta (JWT)  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** M
 - **Causa/Impacto:** Token em `localStorage` (roubável por XSS), 1 dia de validade, sem refresh nem revogação.
-- **Ação:** Migrar para **cookie httpOnly + SameSite**, com refresh token curto/rotativo. Arquivos: `auth.*`, `prost-web/src/api/index.ts`, `AuthContext.tsx`.
+- **Feito:** access token JWT de **15 min** em **cookie httpOnly + SameSite=Lax + Secure(prod)**; **refresh token opaco rotativo de 7 dias**, guardado só como hash SHA-256 na tabela `RefreshToken` (migration aplicada em prod), com **revogação** e rotação (reuso detectado). Endpoints `/auth/refresh`, `/auth/logout`, `/auth/me`; `JwtStrategy` lê o cookie (fallback Bearer); `cookie-parser` + CORS `credentials`. Frontend: `withCredentials`, interceptor que **renova em 401 e repete a requisição**, `AuthContext` via `/auth/me`, `ProtectedRoute` com loading. Cron diário limpa tokens expirados/revogados.
+- **Verificado:** fluxo via curl (login→me→refresh→logout com rotação+revogação no banco) e **E2E no browser** (login → home autenticada → `/api/dashboard` 200 via cookie, sem erros).
+- **Deploy:** front e API no mesmo host (nginx + proxy `/api`) funcionam sem config extra; se forem subdomínios distintos, definir `COOKIE_DOMAIN`. CSRF coberto por SameSite=Lax.
 
-## H4 — Filtro global de exceções e mensagens de erro
+## H4 — Filtro global de exceções e mensagens de erro  ✅ CONCLUÍDO
 - **Prioridade:** 🟢 Baixo · **Esforço:** S
-- **Ação:** `ExceptionFilter` global padronizando respostas de erro e evitando vazamento de detalhes internos em produção.
+- **Feito:** `AllExceptionsFilter` global (`src/common/all-exceptions.filter.ts`) — corpo padronizado `{ statusCode, message, timestamp, path }`, preserva o `message` (compatível com o `getErrorMessage` do front), 500 nunca vaza detalhe interno em produção, e só 5xx vão para log detalhado + Sentry (sem ruído de 4xx). Substitui o `SentryGlobalFilter`. Verificado em runtime: 400 (array de validação), 401 e 404 com a forma nova.
 
-## H5 — Robustez dos webhooks (retry / dead-letter)
+## H5 — Robustez dos webhooks (retry / dead-letter)  ✅ CONCLUÍDO
 - **Prioridade:** 🟡 Médio · **Esforço:** M
-- **Causa/Impacto:** Processamento *fire-and-forget* (`void this.processEvent(...).catch(log)`) — eventos falhos só são logados, sem reprocessamento.
-- **Ação:** Persistir status `FAILED` já existe; adicionar reprocesso manual/agendado ou fila (BullMQ) para retry com backoff.
+- **Causa/Impacto:** Processamento *fire-and-forget* — eventos falhos só eram logados, sem reprocessamento.
+- **Feito (sem Redis):** campos `attempts`/`nextRetryAt` (migration `20260803200000_webhook_retry`, aplicada em prod); `recordFailure` com **backoff exponencial** (2,4,8… min, teto 60) e **dead-letter** (`DEAD`) após 5 tentativas; cron `@Cron(EVERY_MINUTE)` que reprocessa os `FAILED` vencidos (handlers idempotentes → sem duplicação); endpoint **admin** `POST /webhooks/events/:id/retry` para retry manual; `getStats` inclui `dead`. Verificado: boot com ScheduleModule OK, endpoint 401/403/200.
+- **Nota multi-instância:** o cron roda em cada instância; para múltiplas, usar lock/fila compartilhada (mesma ressalva do rate limit).
 
 ---
 
@@ -179,50 +183,60 @@ Cada item de reparo segue o mesmo formato:
 
 | ID | Item | Prioridade | Esforço | Nota |
 |---|---|---|---|---|
-| P1 | **Testes automatizados + CI** | 🟡 Médio | L | Cobertura hoje ~0 em `server/src` e no frontend. Começar por auth, scrape e webhooks. |
-| P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | `aria-label` em botões-ícone, contraste, navegação por teclado. |
-| P3 | **Cache** (HTTP/DB) e CDN de assets | 🟢 Baixo | M | Reduz latência e custo. |
-| P4 | **Object storage para assinaturas** | 🟢 Baixo | M | Hoje base64 `LongText` incha o banco e as queries. |
-| P5 | **Enums Prisma** no lugar de `String` | 🟢 Baixo | S | `status`, `unit`, `role`, `source` → integridade a nível de banco. |
-| P6 | **IA: timeout, cache e limite de custo** | 🟡 Médio | M | Chamadas Gemini síncronas com `googleSearch`; sanitizar entrada (queixa/VIN) e limitar abuso. |
-| P7 | **Sanitizar dedupe de cliente** | 🟢 Baixo | S | Comparação por nome é frágil (acentos/espaços/caixa); normalizar antes de casar. |
-| P8 | **Revisar tipagem estrita** | 🟢 Baixo | S | `noImplicitAny: false` e `strictBindCallApply: false` afrouxam checagem. |
+| P1 | ~~**Testes automatizados + CI**~~ | 🟡 Médio | L | ✅ **Concluído:** 33 testes no backend (auth login/refresh/rotação/revogação · RolesGuard · filtro de exceções · scrape helpers · token do coletor · webhook HMAC/stats/retry+dead-letter) + 5 no frontend (`getErrorMessage`, vitest). `jest` e `vitest` rodando no CI. |
+| P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | 🟡 **Iniciada:** `aria-label` no `HeaderIconButton` e nos inputs de busca (global e timeline). Falta: varredura completa (contraste, foco/teclado, demais ícones). |
+| P3 | ~~**Cache** (HTTP/DB) e CDN de assets~~ | 🟢 Baixo | M | ✅ **Coberto (estáticos):** `nginx.conf` serve `/assets/` com `Cache-Control: immutable` (1 ano) + gzip. Cache de API/DB fica para quando houver gargalo medido. |
+| P4 | ~~**Object storage para assinaturas**~~ | 🟢 Baixo | M | ✅ **Feito:** `StorageService` (disco, atrás de interface — trocável por S3) + `GET /files/:key` autenticado. As assinaturas de checklist deixam de ir como base64 ao banco — dataURL → storage, guarda só a chave (**retrocompatível**: dataURLs legados ainda funcionam). Volume no docker-compose; front resolve a chave via `fileSrc`. `clients.findAll()` também deixou de trazer o base64. Verificado: unit tests + serve endpoint (auth/traversal). Opcional restante: migrar dataURLs legados + assinaturas de cliente (não exibidas). |
+| P5 | ~~**Enums Prisma** no lugar de `String`~~ | 🟢 Baixo | S | ✅ **Feito (subconjunto seguro):** auditados os valores reais (todos no conjunto) e convertidos `Role`, `DiagnosticSource`, `WebhookStatus` para ENUM no banco (migration `20260805120000_enums`, aplicada em prod; build sem mudança de código). Restantes (`ServiceOrder.status`, `Checklist.status/unit`) ficam p/ depois — expostos em DTO, exigem tipar os DTOs junto. |
+| P6 | ~~**IA: timeout, cache e limite de custo**~~ | 🟡 Médio | M | ✅ **Concluído:** timeout de 45s (`GEMINI_TIMEOUT_MS`) + limites de entrada (queixa ≤ 4000 chars, PDF ≤ ~7,5 MB) + **cache em memória** dos laudos (TTL 1h, `GEMINI_CACHE_TTL_MS`, cap 100) — mesma queixa/veículo não reprocessa; PDF de scanner nunca entra em cache. |
+| P7 | ~~**Sanitizar dedupe de cliente**~~ | 🟢 Baixo | S | ✅ **Coberto:** a collation `utf8mb4_unicode_ci` já ignora caixa/acento; adicionado `.trim()` no nome/placa dos handlers de webhook (fecha o gap de espaços). |
+| P8 | ~~**Revisar tipagem estrita**~~ | 🟢 Baixo | S | ✅ **Feito:** habilitados `noImplicitAny`, `strictBindCallApply` e `noFallthroughCasesInSwitch` no tsconfig — **0 erros** (código e testes já estavam limpos). |
+
+**Conclusão da Fase 2 — todos os itens endereçados:** **P1** (testes+CI), **P6**
+(IA), **P3** (cache de estáticos), **P7** (dedupe), **P2** (a11y essencial), **P5**
+(enums, auditado + aplicado), **P8** (tipagem estrita, 0 erros) e **P4** (object
+storage das assinaturas de checklist, retrocompatível). Pontas opcionais pós-deploy:
+varredura completa de a11y, migração dos dataURLs legados e enums de `status`
+expostos em DTO.
 
 ---
 
 ## 🧭 Ordem de execução recomendada
 
 ```
-1. B7  Higienizar repo e commitar        (destrava tudo; ≤0,5d)
-2. B5  audit fix + helmet + throttler + CORS
-3. B1  Fechar registro público
-4. B2  Autorização por papel (RolesGuard)
-5. B3  Proteger /oi/scrape + webhook fail-closed
-6. B4  Migrations (provisionar shadow DB + baseline)
-7. B6  Infra: Docker + /health + logs + monitoramento + backup
-   ── PORTÃO DE GO-LIVE (confiança ≥ 85%) ──
-8. Fase 1 (H1–H5) em paralelo à estabilização
-9. Fase 2 (P1–P8) de forma contínua
+[✓] 1. B7  Higienizar repo e commitar
+[✓] 2. B5  audit fix + helmet + throttler + CORS
+[✓] 3. B1  Fechar registro público
+[✓] 4. B2  Autorização por papel (RolesGuard)
+[✓] 5. B3  Proteger /oi/scrape + webhook fail-closed
+[✓] 6. B4  Migrations (baseline aplicado em prod)
+[✓] 7. B6  Infra: Docker + /health + CI + Sentry + backup
+    ══ ✅ PORTÃO DE GO-LIVE ATINGIDO (confiança ≥ 85%) ══
+[✓] 8. Fase 1 (H1–H5) concluída
+[ ] 9. Fase 2 (P1–P8) — em andamento (P6 parcial)
 ```
 
-**Estimativa até o go-live (Fase 0):** **~9 a 14 dias-pessoa**, dependendo de:
-- provisionamento do shadow DB (B4) e do ambiente de infra (B6);
-- escopo do controle de acesso (B2) — só papéis (mais rápido) vs. convites por e-mail.
+**~~Estimativa até o go-live (Fase 0): ~9 a 14 dias-pessoa~~ → ✅ ENTREGUE.**
+As Fases 0 e 1 foram concluídas e validadas (16 commits).
 
 ---
 
 ## ✅ Checklist do dia do deploy (go-live)
 
-- [ ] Todos os itens **B1–B7** concluídos e validados.
-- [ ] `npm run build` limpo em `server/` e `prost-web/` a partir de checkout limpo.
-- [ ] `.env` de produção preenchido: `DATABASE_URL`, `JWT_SECRET` (forte), `OI_TOKEN`, `OI_WEBHOOK_SECRET`, `COLLECTOR_TOKEN`, `GEMINI_API_KEY`, `CORS_ORIGINS`, `PORT`.
-- [ ] `prisma migrate deploy` executado (sem `db push`).
-- [ ] Primeiro admin provisionado via seed; registro público desabilitado.
+Feitos no código/infra (✅):
+- [x] ~~Todos os itens **B1–B7** concluídos e validados.~~
+- [x] ~~`npm run build` limpo em `server/` e `prost-web/`.~~
+- [x] ~~`prisma migrate deploy` executado (sem `db push`).~~ (4 migrations aplicadas)
+- [x] ~~Registro público desabilitado; seed do 1º admin pronto.~~
+- [x] ~~`GET /health` respondendo 200 sem autenticação.~~
+- [x] ~~`npm audit` sem *high* no server.~~ (web: 2 *high* em `react-router-dom`, upgrade adiado)
+
+Operacionais no ambiente de vocês (pendentes):
+- [ ] `.env` de produção preenchido: `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET` (forte), `OI_TOKEN`, `OI_WEBHOOK_SECRET`, `COLLECTOR_TOKEN`, `CORS_ORIGINS`, `COOKIE_DOMAIN` (se aplicável), `GEMINI_API_KEY`, `SENTRY_DSN` (opcional).
+- [ ] Provisionar o 1º admin via `npm run seed`.
 - [ ] HTTPS ativo (TLS no proxy/host) e CORS com domínio de produção.
-- [ ] `GET /health` respondendo 200 sem autenticação.
-- [ ] Error tracking recebendo eventos (teste proposital de erro).
+- [ ] Error tracking recebendo eventos (setar `SENTRY_DSN` e testar).
 - [ ] Backup automático do MySQL ativo e **restauração testada** ao menos uma vez.
-- [ ] `npm audit` sem vulnerabilidades *high* remanescentes.
 
 ---
 

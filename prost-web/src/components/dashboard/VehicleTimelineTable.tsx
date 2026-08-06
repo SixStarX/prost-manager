@@ -135,6 +135,7 @@ export function VehicleTimelineTable({ items }: Props) {
             value={query}
             disabled={loading}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar cliente, placa ou modelo"
             placeholder="Buscar cliente, placa ou modelo…"
             className={cn(
               'w-full pl-9 pr-3 py-[9px] bg-raised border border-white/[.08] rounded-sm',

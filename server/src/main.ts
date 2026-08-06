@@ -3,6 +3,7 @@ import './instrument';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 // Origens liberadas no CORS. Em produção, sobrescreva com CORS_ORIGINS (lista
@@ -19,6 +20,8 @@ async function bootstrap() {
 
   // Cabeçalhos de segurança (HSTS, no-sniff, frameguard, etc.).
   app.use(helmet());
+  // Lê os cookies httpOnly de sessão (access/refresh).
+  app.use(cookieParser());
 
   const corsOrigins = (
     process.env.CORS_ORIGINS
@@ -30,6 +33,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: corsOrigins,
+    // Necessário para o navegador enviar/receber os cookies httpOnly de sessão.
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));

@@ -7,6 +7,9 @@ services:
     env_file: ./server/.env          # segredos reais (gitignored)
     environment:
       NODE_ENV: production
+      STORAGE_DIR: /app/uploads
+    volumes:
+      - prost-uploads:/app/uploads   # assinaturas (fora do banco — P4)
     ports:
       - "3000:3000"
     restart: unless-stopped
@@ -29,3 +32,6 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+volumes:
+  prost-uploads:
