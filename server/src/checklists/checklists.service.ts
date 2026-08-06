@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateChecklistDto } from './dto/create-checklist.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 
@@ -23,7 +24,10 @@ const normDoc = (d?: string | null) => (d ?? '').replace(/\D/g, '');
 
 @Injectable()
 export class ChecklistsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   /**
    * Próxima sequência de protocolo do ano corrente. Baseada no maior
@@ -220,6 +224,15 @@ export class ChecklistsService {
       signedAt: overrides.signedAt,
     };
 
+    // Assinaturas base64 (dataURL) → storage; guarda só a chave (P4).
+    data.signCompanyImage =
+      (await this.storage.persistDataUrl(
+        data.signCompanyImage,
+        'checklists',
+      )) ?? undefined;
+    data.signClientImage =
+      (await this.storage.persistDataUrl(data.signClientImage, 'checklists')) ??
+      undefined;
     return this.prisma.checklist.create({ data });
   }
 
@@ -274,7 +287,19 @@ export class ChecklistsService {
 
     // `whitelist` já removeu chaves desconhecidas; repassamos o DTO direto.
     // Json fields aceitam objeto ou undefined; demais campos aceitam null p/ limpar.
-    const data = { ...dto } as Prisma.ChecklistUpdateInput;
+    // Assinaturas: dataURL → storage (só a chave vai ao banco); null/undefined
+    // e chaves já existentes passam direto (retrocompatível — P4).
+    const data = {
+      ...dto,
+      signCompanyImage: await this.storage.persistDataUrl(
+        dto.signCompanyImage,
+        'checklists',
+      ),
+      signClientImage: await this.storage.persistDataUrl(
+        dto.signClientImage,
+        'checklists',
+      ),
+    } as Prisma.ChecklistUpdateInput;
 
     // Transferência de unidade (ex.: Mecânica → Funilaria): o protocolo
     // acompanha a nova sigla, preservando sequência e ano — o atendimento

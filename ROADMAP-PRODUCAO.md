@@ -20,11 +20,10 @@ Correções em andamento na branch **`fix/auth-security-blockers`**.
 | B4 — Migrations (Prisma Migrate) | ✅ **Concluído** (baseline aplicado em prod) | baseline `0_init` |
 | B6 — Infra (Docker/health/CI/Sentry/backup) | ✅ **Concluído** | health · Docker · CI · Sentry · backup |
 
-**🎉 Fases 0, 1 e 2 concluídas** (só a metade "object storage" do P4 segue
-pendente). Fase 0 (7/7) + Fase 1 (H1–H5) + Fase 2: P1 testes/CI · P6 IA · P3 cache
-de estáticos · P7 dedupe · P2 a11y essencial · **P5 enums (aplicado)** · **P8
-tipagem estrita** · **P4 parcial** (query bloat resolvido; migração p/ object
-storage adiada — infra). Guia de deploy/staging em [DEPLOY.md](DEPLOY.md).
+**🎉 Fases 0, 1 e 2 concluídas.** Fase 0 (7/7) + Fase 1 (H1–H5) + Fase 2 (P1–P8).
+Restam apenas pontas opcionais (varredura completa de a11y; migrar dataURLs
+legados de assinatura; enums de `status` expostos em DTO). Guia de deploy/staging
+em [DEPLOY.md](DEPLOY.md).
 
 > Cada correção foi validada com build + ESLint + smoke test de runtime, com
 > confirmação de **0 escritas** indevidas no banco.
@@ -187,18 +186,18 @@ Cada item de reparo segue o mesmo formato:
 | P1 | ~~**Testes automatizados + CI**~~ | 🟡 Médio | L | ✅ **Concluído:** 33 testes no backend (auth login/refresh/rotação/revogação · RolesGuard · filtro de exceções · scrape helpers · token do coletor · webhook HMAC/stats/retry+dead-letter) + 5 no frontend (`getErrorMessage`, vitest). `jest` e `vitest` rodando no CI. |
 | P2 | **Auditoria de acessibilidade** | 🟢 Baixo | M | 🟡 **Iniciada:** `aria-label` no `HeaderIconButton` e nos inputs de busca (global e timeline). Falta: varredura completa (contraste, foco/teclado, demais ícones). |
 | P3 | ~~**Cache** (HTTP/DB) e CDN de assets~~ | 🟢 Baixo | M | ✅ **Coberto (estáticos):** `nginx.conf` serve `/assets/` com `Cache-Control: immutable` (1 ano) + gzip. Cache de API/DB fica para quando houver gargalo medido. |
-| P4 | **Object storage para assinaturas** | 🟢 Baixo | M | 🟡 **Parcial:** resolvida a metade "queries incham" — `clients.findAll()` deixou de trazer as assinaturas base64 (checklist/dashboard já usavam `select`). A metade "banco incha" (migrar dataURLs → object storage) fica p/ depois: exige infra (S3/disco) + migração dos dados + mudar upload/leitura no back e no front. |
+| P4 | ~~**Object storage para assinaturas**~~ | 🟢 Baixo | M | ✅ **Feito:** `StorageService` (disco, atrás de interface — trocável por S3) + `GET /files/:key` autenticado. As assinaturas de checklist deixam de ir como base64 ao banco — dataURL → storage, guarda só a chave (**retrocompatível**: dataURLs legados ainda funcionam). Volume no docker-compose; front resolve a chave via `fileSrc`. `clients.findAll()` também deixou de trazer o base64. Verificado: unit tests + serve endpoint (auth/traversal). Opcional restante: migrar dataURLs legados + assinaturas de cliente (não exibidas). |
 | P5 | ~~**Enums Prisma** no lugar de `String`~~ | 🟢 Baixo | S | ✅ **Feito (subconjunto seguro):** auditados os valores reais (todos no conjunto) e convertidos `Role`, `DiagnosticSource`, `WebhookStatus` para ENUM no banco (migration `20260805120000_enums`, aplicada em prod; build sem mudança de código). Restantes (`ServiceOrder.status`, `Checklist.status/unit`) ficam p/ depois — expostos em DTO, exigem tipar os DTOs junto. |
 | P6 | ~~**IA: timeout, cache e limite de custo**~~ | 🟡 Médio | M | ✅ **Concluído:** timeout de 45s (`GEMINI_TIMEOUT_MS`) + limites de entrada (queixa ≤ 4000 chars, PDF ≤ ~7,5 MB) + **cache em memória** dos laudos (TTL 1h, `GEMINI_CACHE_TTL_MS`, cap 100) — mesma queixa/veículo não reprocessa; PDF de scanner nunca entra em cache. |
 | P7 | ~~**Sanitizar dedupe de cliente**~~ | 🟢 Baixo | S | ✅ **Coberto:** a collation `utf8mb4_unicode_ci` já ignora caixa/acento; adicionado `.trim()` no nome/placa dos handlers de webhook (fecha o gap de espaços). |
 | P8 | ~~**Revisar tipagem estrita**~~ | 🟢 Baixo | S | ✅ **Feito:** habilitados `noImplicitAny`, `strictBindCallApply` e `noFallthroughCasesInSwitch` no tsconfig — **0 erros** (código e testes já estavam limpos). |
 
-**Conclusão da Fase 2:** feitos — **P1** (testes+CI), **P6** (IA), **P3** (cache de
-estáticos), **P7** (dedupe), **P2** (a11y essencial), **P5** (enums no banco,
-auditado + aplicado) e **P8** (tipagem estrita, 0 erros). **P4** ficou **parcial**:
-o bloat de query foi resolvido; a migração das assinaturas para **object storage**
-segue adiada por exigir infra nova (S3/disco) + migração de dados + mudança
-coordenada back/front — item de feature dedicado, pós-deploy.
+**Conclusão da Fase 2 — todos os itens endereçados:** **P1** (testes+CI), **P6**
+(IA), **P3** (cache de estáticos), **P7** (dedupe), **P2** (a11y essencial), **P5**
+(enums, auditado + aplicado), **P8** (tipagem estrita, 0 erros) e **P4** (object
+storage das assinaturas de checklist, retrocompatível). Pontas opcionais pós-deploy:
+varredura completa de a11y, migração dos dataURLs legados e enums de `status`
+expostos em DTO.
 
 ---
 

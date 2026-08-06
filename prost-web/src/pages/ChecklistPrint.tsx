@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../api';
 import { formatDate } from '@/lib/format';
+import { fileSrc } from '@/lib/files';
 import {
   checklistStatusLabel,
   formatTime,
@@ -270,7 +271,7 @@ function Signature({ role, name, image }: { role: string; name?: string | null; 
   return (
     <div className="cp-sign">
       {image ? (
-        <img src={image} alt={`Assinatura ${role}`} className="cp-signimg" />
+        <img src={fileSrc(image)} alt={`Assinatura ${role}`} className="cp-signimg" />
       ) : (
         <div className="cp-signline" />
       )}

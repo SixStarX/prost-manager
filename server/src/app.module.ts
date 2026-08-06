@@ -17,6 +17,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { OiModule } from './oficina-inteligente/oi.module';
 import { HealthModule } from './health/health.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { HealthModule } from './health/health.module';
     WebhooksModule,
     OiModule,
     HealthModule,
+    StorageModule,
   ],
   providers: [
     // Filtro global: padroniza erros e reporta 5xx ao Sentry (no-op sem DSN).

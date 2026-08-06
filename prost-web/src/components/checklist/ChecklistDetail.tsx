@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlateBadge } from '@/components/common/PlateBadge';
 import { formatDate } from '@/lib/format';
+import { fileSrc } from '@/lib/files';
 import {
   checklistStatusLabel,
   checklistStatusVariant,
@@ -64,7 +65,7 @@ function SignatureCard({
       </span>
       <div className="h-24 rounded-sm bg-raised border border-white/[.08] flex items-center justify-center overflow-hidden">
         {image ? (
-          <img src={image} alt={`Assinatura ${role}`} className="max-h-full max-w-full object-contain" />
+          <img src={fileSrc(image)} alt={`Assinatura ${role}`} className="max-h-full max-w-full object-contain" />
         ) : (
           <span className="text-t4 text-xs">Sem assinatura</span>
         )}
