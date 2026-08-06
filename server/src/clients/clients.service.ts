@@ -11,7 +11,31 @@ export class ClientsService {
   }
 
   findAll() {
-    return this.prisma.client.findMany();
+    // Não traz as assinaturas base64 (LongText) na listagem — evita bloat de
+    // query/resposta; elas só interessam no perfil/detalhe do cliente (P4).
+    return this.prisma.client.findMany({
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        cpfcnpj: true,
+        whatsapp: true,
+        birthDate: true,
+        zip: true,
+        street: true,
+        number: true,
+        complement: true,
+        neighborhood: true,
+        city: true,
+        state: true,
+        notes: true,
+        preferences: true,
+        initialHistory: true,
+        responsible: true,
+        createdAt: true,
+      },
+    });
   }
 
   findOne(id: string) {

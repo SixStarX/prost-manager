@@ -14,7 +14,7 @@ model User {
   password  String
   // Menor privilégio por padrão. O papel real é sempre definido pela aplicação
   // (AuthService / seed); este default é apenas defesa em profundidade.
-  role      String   @default("USER")
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
 
   refreshTokens RefreshToken[]
@@ -194,7 +194,7 @@ model Diagnostic {
   system      String?             // sistema afetado (Elétrico, Mecânico…)
   confidence  String?             // Alta | Média | Baixa
   aiResult    String?  @db.Text   // JSON completo retornado pela IA
-  source      String   @default("manual") // manual | ai
+  source      DiagnosticSource @default(manual)
 
   vehicleId   String
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
@@ -254,8 +254,7 @@ model WebhookEvent {
   source      String                          // "oficina_inteligente"
   event       String                          // tipo do evento
   payload     String   @db.Text              // JSON bruto recebido
-  // RECEIVED | PROCESSED | IGNORED | FAILED (aguardando retry) | DEAD (esgotado)
-  status      String   @default("RECEIVED")
+  status      WebhookStatus @default(RECEIVED)
   error       String?  @db.Text
   attempts    Int      @default(0)            // nº de tentativas de processamento
   nextRetryAt DateTime?                        // quando FAILED, próximo retry (cron)
@@ -263,4 +262,26 @@ model WebhookEvent {
   processedAt DateTime?
 
   @@index([status, nextRetryAt])              // usado pelo cron de retry
+}
+
+// ── Enums (integridade a nível de banco) ─────────────────────────
+// Convertidos de String após auditoria dos valores existentes (todos dentro
+// do conjunto). Campos definidos server-side, sem exposição em DTO.
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum DiagnosticSource {
+  manual
+  ai
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+  DEAD
 }
