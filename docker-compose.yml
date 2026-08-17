@@ -1,6 +1,9 @@
 # Orquestração de produção do PROST Manager.
 # O banco é MySQL remoto (via DATABASE_URL no server/.env), então não há serviço
-# de DB aqui. Suba com:  docker compose up -d --build
+# de DB aqui. Suba com:  SITE_ADDRESS=seudominio.com docker compose up -d --build
+#
+# TLS: o serviço `caddy` termina HTTPS (Let's Encrypt automático) e repassa para o
+# `web`. Só as portas 80/443 do Caddy ficam públicas; `server` e `web` são internos.
 services:
   server:
     build: ./server
@@ -11,7 +14,9 @@ services:
     volumes:
       - prost-uploads:/app/uploads   # assinaturas (fora do banco — P4)
     ports:
-      - "3000:3000"
+      # Só no loopback do host: permite rodar validate-staging/migrate:status
+      # localmente sem expor a API à internet (o tráfego público entra pelo Caddy).
+      - "127.0.0.1:3000:3000"
     restart: unless-stopped
     healthcheck:
       test:
@@ -29,9 +34,28 @@ services:
     depends_on:
       server:
         condition: service_healthy
+    restart: unless-stopped
+    # Sem `ports`: acessível só na rede interna do compose (o Caddy é a porta de entrada).
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - web
+    environment:
+      # Endereço público do site. Em produção, o domínio (Caddy emite/renova TLS).
+      # Local/CI: use "localhost". Default seguro: localhost.
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
     ports:
-      - "8080:80"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       # certificados (persistir entre restarts!)
+      - caddy-config:/config
     restart: unless-stopped
 
 volumes:
   prost-uploads:
+  caddy-data:
+  caddy-config:

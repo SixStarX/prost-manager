@@ -1,0 +1,16 @@
+# Reverse proxy com HTTPS automático (Let's Encrypt) na frente do container `web`.
+#
+# O endereço do site vem da variável SITE_ADDRESS (interpolada pelo compose):
+#   - Produção:  SITE_ADDRESS=app.suaoficina.com.br  -> Caddy emite/renova TLS sozinho
+#   - Local/CI:  SITE_ADDRESS=localhost               -> serve em HTTP/HTTPS local (cert interno)
+#   - HTTP puro: SITE_ADDRESS=:80                     -> sem TLS (ex.: atrás de outro LB)
+#
+# Opcional: para receber avisos de expiração do Let's Encrypt, descomente a linha
+# `tls` abaixo e informe um e-mail (ou defina o bloco global `{ email ... }`).
+
+{$SITE_ADDRESS:localhost} {
+	encode gzip
+	# tls voce@suaoficina.com.br
+	# Repassa tudo para o nginx do frontend, que serve o SPA e faz proxy de /api.
+	reverse_proxy web:80
+}
