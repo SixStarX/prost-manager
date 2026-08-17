@@ -35,7 +35,9 @@ Copie `server/.env.example` → `server/.env` e preencha. **Obrigatórias em pro
 `.suaoficina.com.br`), `SENTRY_DSN`, `GEMINI_TIMEOUT_MS`, `PORT`.
 
 > ⚠️ HTTPS é necessário em produção: com `NODE_ENV=production` os cookies são
-> `Secure` e só trafegam sobre TLS. Configure o TLS no proxy/host.
+> `Secure` e só trafegam sobre TLS. O TLS é feito pelo serviço **Caddy** do
+> `docker-compose` (Let's Encrypt automático) — basta o domínio em `SITE_ADDRESS`
+> apontar para o host (registro DNS A).
 
 ---
 
@@ -55,10 +57,23 @@ npm run migrate:status   # deve dizer "Database schema is up to date!"
 
 ## 3. Primeiro administrador (seed idempotente)
 
+Fora de container (host com deps de dev instaladas):
+
 ```bash
 ADMIN_BOOTSTRAP_EMAIL=admin@suaoficina.com \
 ADMIN_BOOTSTRAP_PASSWORD=umaSenhaForte \
 npm run seed
+```
+
+**Dentro do container de produção** use `node` no seed já compilado — **não**
+`npm run seed`/`prisma db seed` (o `ts-node` é removido da imagem pelo
+`npm prune --omit=dev`):
+
+```bash
+docker compose exec \
+  -e ADMIN_BOOTSTRAP_EMAIL=admin@suaoficina.com \
+  -e ADMIN_BOOTSTRAP_PASSWORD=umaSenhaForte \
+  server node dist/prisma/seed.js
 ```
 
 Só cria se ainda não houver ADMIN. Depois, novos usuários são criados pelo admin
@@ -68,16 +83,21 @@ via `POST /auth/register`.
 
 ## 4. Subir a stack
 
-Na raiz do projeto:
+Na raiz do projeto, informando o domínio ao Caddy:
 
 ```bash
-docker compose up -d --build
+SITE_ADDRESS=SEU_DOMINIO docker compose up -d --build
 ```
 
-- **server** → `:3000` (API NestJS, com healthcheck nativo)
-- **web** → `:8080` (nginx servindo o build + proxy de `/api` para o server)
+- **caddy** → `:80/:443` (TLS automático via Let's Encrypt; **única entrada pública**)
+- **web** → interno (nginx servindo o build + proxy de `/api` para o server)
+- **server** → `127.0.0.1:3000` no host (API NestJS; loopback só p/ tooling local)
 
-O `web` só sobe depois que o `server` fica *healthy* (depends_on + healthcheck).
+O `web` só sobe depois que o `server` fica *healthy* (depends_on + healthcheck), e o
+`caddy` fica na frente terminando HTTPS. Em produção, defina `SITE_ADDRESS` com o
+domínio; localmente use `localhost` (o Caddy serve com certificado interno).
+
+> Guia passo-a-passo específico p/ VPS: [GO-LIVE.md](GO-LIVE.md).
 
 ---
 
@@ -91,7 +111,7 @@ curl -s http://localhost:3000/health        # {"status":"ok","db":"up",...}
 cd server && npm run migrate:status          # "Database schema is up to date!"
 ```
 
-No navegador (`http://localhost:8080`):
+No navegador (`https://SEU_DOMINIO`):
 
 1. **Login** com o admin do seed → deve navegar para a home.
 2. Confira nas DevTools (Application → Cookies) os cookies **`access_token`** e

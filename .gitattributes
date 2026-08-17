@@ -1,0 +1,3 @@
+# Scripts executados dentro de containers Linux precisam de LF, senão o `sh`
+# engasga com o \r do CRLF (o comando vira "prisma\r" e falha).
+*.sh text eol=lf
